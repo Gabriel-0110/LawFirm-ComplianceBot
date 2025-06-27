@@ -7,87 +7,50 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
-    
+    runs-on: windows-latest
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up .NET Core
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '9.0.x'
-        
+
     - name: Build with dotnet
       run: dotnet build --configuration Release
-      
+
     - name: dotnet publish
-      run: dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp
+      run: dotnet publish -c Release -o $env:DOTNET_ROOT\myapp
 
     - name: Azure Login
       uses: Azure/login@v2.3.0
       with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          allow-no-subscriptions: false
-          enable-AzPSSession: false
-          environment: azurecloud
-          audience: api://AzureADTokenExchange
-          auth-type: SERVICE_PRINCIPAL
-  
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
     - name: Deploy to Azure Web App
       id: deploy-to-webapp
       uses: azure/webapps-deploy@v2
       with:
-        app-name: 'teamsbot'  # Replace with your app name
+        app-name: 'teamsbot'
         slot-name: 'Production'
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: ${{env.DOTNET_ROOT}}/myapp
-        
+        package: $env:DOTNET_ROOT\myapp
+
     - name: Configure App Settings
       uses: azure/appservice-settings@v1
       with:
-        app-name: 'arandiabot-app'  # Replace with your app name
+        app-name: 'teamsbot'
         app-settings-json: |
           [
-            {
-              "name": "MicrosoftAppId",
-              "value": "${{ secrets.MICROSOFT_APP_ID }}"
-            },
-            {
-              "name": "MicrosoftAppPassword", 
-              "value": "${{ secrets.MICROSOFT_APP_PASSWORD }}"
-            },
-            {
-              "name": "MicrosoftAppTenantId",
-              "value": "${{ secrets.MICROSOFT_APP_TENANT_ID }}"
-            },
-            {
-              "name": "AzureAd__TenantId",
-              "value": "${{ secrets.MICROSOFT_APP_TENANT_ID }}"
-            },
-            {
-              "name": "AzureAd__ClientId", 
-              "value": "${{ secrets.AZURE_AD_CLIENT_ID }}"
-            },
-            {
-              "name": "AzureAd__ClientSecret",
-              "value": "${{ secrets.AZURE_AD_CLIENT_SECRET }}"
-            },
-            {
-              "name": "ConnectionStrings__BlobStorage",
-              "value": "${{ secrets.BLOB_STORAGE_CONNECTION }}"
-            },
-            {
-              "name": "ApplicationInsights__ConnectionString",
-              "value": "${{ secrets.APPLICATION_INSIGHTS_CONNECTION }}"
-            },
-            {
-              "name": "Azure__StorageAccount",
-              "value": "${{ secrets.STORAGE_ACCOUNT_NAME }}"
-            },
-            {
-              "name": "Storage__ConnectionString",
-              "value": "${{ secrets.BLOB_STORAGE_CONNECTION }}"
-            }
+            { "name": "MicrosoftAppId", "value": "${{ secrets.MICROSOFT_APP_ID }}" },
+            { "name": "MicrosoftAppPassword", "value": "${{ secrets.MICROSOFT_APP_PASSWORD }}" },
+            { "name": "MicrosoftAppTenantId", "value": "${{ secrets.MICROSOFT_APP_TENANT_ID }}" },
+            { "name": "AzureAd__TenantId", "value": "${{ secrets.MICROSOFT_APP_TENANT_ID }}" },
+            { "name": "AzureAd__ClientId", "value": "${{ secrets.AZURE_AD_CLIENT_ID }}" },
+            { "name": "AzureAd__ClientSecret", "value": "${{ secrets.AZURE_AD_CLIENT_SECRET }}" },
+            { "name": "ConnectionStrings__BlobStorage", "value": "${{ secrets.BLOB_STORAGE_CONNECTION }}" },
+            { "name": "ApplicationInsights__ConnectionString", "value": "${{ secrets.APPLICATION_INSIGHTS_CONNECTION }}" },
+            { "name": "Azure__StorageAccount", "value": "${{ secrets.STORAGE_ACCOUNT_NAME }}" },
+            { "name": "Storage__ConnectionString", "value": "${{ secrets.BLOB_STORAGE_CONNECTION }}" }
           ]
