@@ -22,12 +22,15 @@ jobs:
       
     - name: dotnet publish
       run: dotnet publish -c Release -o ${{env.DOTNET_ROOT}}/myapp
-      
+
+    - name: Azure Login
+      uses: Azure/login@v2.3.0
+  
     - name: Deploy to Azure Web App
       id: deploy-to-webapp
       uses: azure/webapps-deploy@v2
       with:
-        app-name: 'arandiabot-app'  # Replace with your app name
+        app-name: 'teamsbot'  # Replace with your app name
         slot-name: 'Production'
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         package: ${{env.DOTNET_ROOT}}/myapp
