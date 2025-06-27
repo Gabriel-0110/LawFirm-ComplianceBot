@@ -1,0 +1,37 @@
+{
+  "dependencies": {
+    "apis1": {
+      "ignored": "true",
+      "type": "apis.azure"
+    },
+    "storage1": {
+      "ignored": "true",
+      "type": "storage",
+      "connectionId": "ConnectionStrings:BlobStorage1",
+      "dynamicId": null
+    },
+    "storage2": {
+      "ignored": "true",
+      "type": "storage",
+      "connectionId": "ConnectionStrings:BlobStorage"
+    },
+    "storage3": {
+      "ignored": "true",
+      "type": "storage",
+      "connectionId": "Storage:ConnectionString"
+    },
+    "appInsights1": {
+      "secretStore": "AzureAppSettings",
+      "resourceId": "/subscriptions/[parameters('subscriptionId')]/resourceGroups/[parameters('resourceGroupName')]/providers/microsoft.insights/components/arandiabot-app",
+      "type": "appInsights.azure",
+      "connectionId": "APPLICATIONINSIGHTS_CONNECTION_STRING"
+    },
+    "storage4": {
+      "serviceConnectorResourceId": "/subscriptions/[parameters('subscriptionId')]/resourceGroups/[parameters('serviceConnectorResourceGroupName')]/providers/Microsoft.Web/sites/arandiabot-app/providers/Microsoft.ServiceLinker/linkers/StorageConnection_F35CECA5DC, /subscriptions/b90a001e-0b0f-4114-8752-084c1babb416/resourceGroups/Arandia-Apps/providers/Microsoft.Web/sites/arandiabot-app/providers/Microsoft.ServiceLinker/linkers/StorageConnection_DF1220C935",
+      "secretStore": "AzureAppSettings",
+      "resourceId": "/subscriptions/[parameters('subscriptionId')]/resourceGroups/[parameters('resourceGroupName')]/providers/Microsoft.Storage/storageAccounts/arandiabotstorage",
+      "type": "storage.azure",
+      "connectionId": "StorageConnection"
+    }
+  }
+}

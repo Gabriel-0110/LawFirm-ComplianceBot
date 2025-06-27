@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "storage1": {
+      "type": "storage",
+      "connectionId": "ConnectionStrings:BlobStorage1",
+      "dynamicId": null
+    },
+    "appInsights1": {
+      "type": "appInsights",
+      "connectionId": "APPLICATIONINSIGHTS_CONNECTION_STRING"
+    },
+    "storage4": {
+      "type": "storage",
+      "connectionId": "StorageConnection"
+    }
+  }
+}

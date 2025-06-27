@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: teams-compliance-bot
+metadata:
+  template: teams-compliance-bot@0.0.1-beta
+
+services:
+  teams-compliance-bot:
+    project: TeamsComplianceBot
+    language: dotnet
+    host: appservice
+
+hooks:
+  postdeploy:
+    shell: pwsh
+    run: |
+      echo "Deployment completed successfully!"
+      echo "Bot endpoint: $(azd env get-values --output json | jq -r .WEBSITE_HOSTNAME)"
+      echo "Please update your Bot Service endpoint URL in the Azure portal to: https://$(azd env get-values --output json | jq -r .WEBSITE_HOSTNAME)/api/messages"

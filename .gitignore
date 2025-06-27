@@ -1,0 +1,103 @@
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio files
+.vs/
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+*.dll
+*.exe
+*.pdb
+
+# MSTest test Results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# NUnit
+*.VisualState.xml
+TestResult.xml
+nunit-*.xml
+
+# .NET Core
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ASP.NET Scaffolding
+ScaffoldingReadMe.txt
+
+# Publish results
+publish/
+[Pp]ublish*/
+
+# Azure deployment artifacts
+deploytemp/
+*.zip
+
+# Environment files
+.env
+appsettings.Development.json
+appsettings.Local.json
+
+# Azure Functions
+local.settings.json
+
+# Test results and logs
+*test-results*.json
+bot-test-results*.json
+production-test-results*.json
+realistic-test.json
+test-payloads.json
+
+# Monitoring and diagnostic scripts (keep for local development)
+*monitor*.ps1
+*test*.ps1
+*diagnostic*.ps1
+comprehensive*.ps1
+
+# Temporary documentation
+PRODUCTION*.md
+DIAGNOSTIC*.md
+DEPLOYMENT*.md
+Teams_Bot_Status*.md
+CALL_JOINING*.md
+
+# SSL certificates (should not be in source control)
+*.cer
+*.key
+*.pem
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Azure CLI files
+.azure/
+
+# Node.js (if any frontend components)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

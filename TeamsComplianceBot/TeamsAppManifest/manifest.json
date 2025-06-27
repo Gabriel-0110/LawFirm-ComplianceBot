@@ -1,0 +1,99 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.22/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.22",
+  "version": "1.0.34",
+  "id": "00000000-0000-0000-0000-000000000000",
+  "developer": {
+    "name": "Your Company",
+    "websiteUrl": "https://yourcompany.com",
+    "privacyUrl": "https://yourcompany.com/privacy",
+    "termsOfUseUrl": "https://yourcompany.com/terms"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "Compliance Bot",
+    "full": "Teams Compliance Recording Bot"
+  },
+  "description": {
+    "short": "Compliance recording for Teams calls and meetings.",
+    "full": "Bot for compliance recording of Microsoft Teams calls and meetings. It supports secure audio/video capture, storage, transcription, and alerting aligned with regulatory standards."
+  },
+  "accentColor": "#FFFFFF",
+  "bots": [
+    {
+      "botId": "00000000-0000-0000-0000-000000000000",
+      "scopes": ["personal", "team", "groupChat"],
+      "supportsFiles": true,
+      "isNotificationOnly": false,
+      "supportsCalling": true,
+      "supportsVideo": true,
+      "commandLists": [
+        {
+          "scopes": ["personal", "team", "groupChat"],
+          "commands": [
+            {
+              "title": "Help",
+              "description": "List available commands and how to use the compliance bot."
+            },
+            {
+              "title": "Hi",
+              "description": "Start a conversation with the compliance bot."
+            },
+            {
+              "title": "Compliance Status",
+              "description": "Check current compliance recording settings and policies."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "arandiabot-app.azurewebsites.net",
+    "token.botframework.com"
+  ],
+  "webApplicationInfo": {
+    "id": "00000000-0000-0000-0000-000000000000",
+    "resource": "https://graph.microsoft.com/"
+  },
+  "authorization": {
+    "permissions": {
+      "resourceSpecific": [
+        {
+          "name": "OnlineMeeting.ReadBasic.Chat",
+          "type": "Application"
+        },
+        {
+          "name": "ChatMember.Read.Chat",
+          "type": "Application"
+        },
+        {
+          "name": "TeamsAppInstallation.ReadWriteAndConsentSelfForChat.All",
+          "type": "Application"
+        }
+      ]
+    }
+  },
+  "activities": {
+    "activityTypes": [
+      {
+        "type": "complianceRecording",
+        "description": "Recording compliance activities",
+        "templateText": "Compliance recording: {activity}"
+      }
+    ]
+  },
+  "defaultInstallScope": "team",
+  "defaultGroupCapability": {
+    "team": "bot",
+    "groupchat": "bot",
+    "meetings": "bot"
+  }
+  }

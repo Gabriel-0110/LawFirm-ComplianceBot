@@ -1,0 +1,16 @@
+{
+  "name": "Teams Compliance Bot",
+  "description": "An enterprise-grade Microsoft Teams bot that automatically records calls and meetings for compliance purposes. Built with ASP.NET Core (.NET 8), Azure Bot Service, Microsoft Graph, and Azure Blob Storage.",
+  "copilot": {
+    "instructions": [
+      "This bot automatically starts recording Microsoft Teams meetings or calls and stores encrypted recordings in Azure Blob Storage.",
+      "It supports secure storage, GDPR-compliant retention policies, legal holds, and audit logging via Application Insights.",
+      "The main logic lives in `BotController.cs`, `CallRecordingService.cs`, and `ComplianceService.cs`.",
+      "Deployment is supported via Azure App Service and includes an ARM template and `deploy-azure.ps1` script.",
+      "Graph API permissions include `OnlineMeetings.ReadWrite.All`, `Calls.AccessMedia.All`, and `User.Read.All`.",
+      "Do not modify authentication logic unless you're updating the Azure AD App registration credentials.",
+      "Follow best practices for handling sensitive compliance data and error recovery.",
+      "When modifying this bot, ensure that all changes respect Teams bot guidelines and Microsoft Graph API rate limits."
+    ]
+  }
+}
