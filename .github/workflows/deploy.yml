@@ -38,6 +38,7 @@ jobs:
         package: ./publish
 
     - name: Configure App Settings using Azure CLI
+      shell: bash
       run: |
         az webapp config appsettings set \
           --name teamsbot \
