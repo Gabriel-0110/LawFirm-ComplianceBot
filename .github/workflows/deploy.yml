@@ -21,7 +21,7 @@ jobs:
       run: dotnet build --configuration Release
 
     - name: dotnet publish
-      run: dotnet publish -c Release -o $env:DOTNET_ROOT\myapp
+      run: dotnet publish -c Release -o ./publish
 
     - name: Azure Login
       uses: Azure/login@v2.3.0
@@ -35,7 +35,7 @@ jobs:
         app-name: 'teamsbot'
         slot-name: 'Production'
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: $env:DOTNET_ROOT\myapp
+        package: ./publish
 
     - name: Configure App Settings
       uses: azure/appservice-settings@v1
