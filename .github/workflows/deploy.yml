@@ -41,6 +41,7 @@ jobs:
       uses: azure/appservice-settings@v1
       with:
         app-name: 'teamsbot'
+        resource-group-name: 'Arandia-Apps'
         app-settings-json: |
           [
             { "name": "MicrosoftAppId", "value": "${{ secrets.MICROSOFT_APP_ID }}" },
