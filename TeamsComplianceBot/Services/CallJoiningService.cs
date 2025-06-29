@@ -27,7 +27,7 @@ namespace TeamsComplianceBot.Services
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         
-        _callbackBaseUrl = _configuration["CallbackBaseUrl"] ?? "https://arandiabot.ggunifiedtech.com";
+        _callbackBaseUrl = _configuration["CallbackBaseUrl"] ?? "https://arandiateamsbot.ggunifiedtech.com";
         _botDisplayName = _configuration["BotDisplayName"] ?? "Teams Compliance Bot";
     }
 

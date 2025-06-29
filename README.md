@@ -55,17 +55,21 @@ ApplicationInsights__ConnectionString=your-application-insights-connection-strin
 ## Deployment
 
 1. Deploy the infrastructure using the Bicep templates in the `infra/` folder
-2. Configure the application settings in Azure App Service
-3. Deploy the application code
+2. Configure the application settings in Azure App Service  
+3. Deploy the application code using GitHub Actions (automatic on push to main)
 4. Update the Teams app manifest with your bot's App ID
 5. Install the Teams app in your tenant
+
+**Live Deployment:**
+- Azure App Service: `teamsbot-cxawdtgqcqh2a3hd.eastus2-01.azurewebsites.net`
+- Custom Domain: `arandiateamsbot.ggunifiedtech.com`
 
 ## Teams App Manifest
 
 Update the `TeamsComplianceBot/TeamsAppManifest/manifest.json` file with:
 - Your bot's App ID in the `id` and `botId` fields
 - Your company information in the `developer` section
-- Your domain in the `validDomains` section
+- Your domain in the `validDomains` section (e.g., `arandiateamsbot.ggunifiedtech.com`)
 
 ## Security Notes
 

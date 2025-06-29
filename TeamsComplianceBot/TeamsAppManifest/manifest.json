@@ -56,7 +56,8 @@
     "messageTeamMembers"
   ],
   "validDomains": [
-    "arandiabot-app.azurewebsites.net",
+    "teamsbot-cxawdtgqcqh2a3hd.eastus2-01.azurewebsites.net",
+    "arandiateamsbot.ggunifiedtech.com",
     "token.botframework.com"
   ],
   "webApplicationInfo": {

@@ -32,7 +32,7 @@ namespace TeamsComplianceBot.Tests
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "Microsoft-SkypeBotApi/1.0");
             
             // Bot configuration
-            _botEndpoint = "https://arandiabot.ggunifiedtech.com";
+            _botEndpoint = "https://arandiateamsbot.ggunifiedtech.com";
             _teamsAppId = "00000000-0000-0000-0000-000000000000";
         }
 
@@ -261,11 +261,11 @@ namespace TeamsComplianceBot.Tests
             try
             {
                 testResult.Details.Add("Checking notification URL configuration:");
-                testResult.Details.Add($"Configured notification URL: https://arandiabot.ggunifiedtech.com/api/notifications");
+                testResult.Details.Add($"Configured notification URL: https://arandiateamsbot.ggunifiedtech.com/api/notifications");
                 testResult.Details.Add($"Bot endpoint: {_botEndpoint}");
                 
                 // Check if notification URL is accessible externally
-                var notificationUrlTest = await _httpClient.GetAsync("https://arandiabot.ggunifiedtech.com/api/notifications");
+                var notificationUrlTest = await _httpClient.GetAsync("https://arandiateamsbot.ggunifiedtech.com/api/notifications");
                 testResult.Details.Add($"External notification URL test: {notificationUrlTest.StatusCode}");
 
                 testResult.Status = DiagnosticStatus.Warning;
@@ -517,7 +517,7 @@ namespace TeamsComplianceBot.Tests
             if (result.EndpointConnectivity?.Status != DiagnosticStatus.Success)
             {
                 recommendations.Add("1. CRITICAL: Fix bot endpoint connectivity issues");
-                recommendations.Add("   - Ensure bot is deployed and accessible at https://arandiabot.ggunifiedtech.com");
+                recommendations.Add("   - Ensure bot is deployed and accessible at https://arandiateamsbot.ggunifiedtech.com");
                 recommendations.Add("   - Check Azure App Service status and configuration");
             }
 

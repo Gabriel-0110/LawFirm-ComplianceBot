@@ -17,7 +17,7 @@ namespace TeamsComplianceBot.Tests
         private readonly string _baseUrl;
         private readonly List<DiagnosticResult> _results;
 
-        public CallJoiningDiagnostic(string baseUrl = "https://arandiabot-app.azurewebsites.net")
+        public CallJoiningDiagnostic(string baseUrl = "https://teamsbot-cxawdtgqcqh2a3hd.eastus2-01.azurewebsites.net")
         {
             _baseUrl = baseUrl;
             _httpClient = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
