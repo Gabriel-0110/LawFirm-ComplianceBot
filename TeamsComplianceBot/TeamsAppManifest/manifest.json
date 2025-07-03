@@ -1,13 +1,13 @@
 {
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.22/MicrosoftTeams.schema.json",
   "manifestVersion": "1.22",
-  "version": "1.0.34",
-  "id": "00000000-0000-0000-0000-000000000000",
+  "version": "1.0.40",
+  "id": "153ad72f-6fa4-4e88-b0fe-f0f785466699",
   "developer": {
-    "name": "Your Company",
-    "websiteUrl": "https://yourcompany.com",
-    "privacyUrl": "https://yourcompany.com/privacy",
-    "termsOfUseUrl": "https://yourcompany.com/terms"
+    "name": "Arandia Law Firm",
+    "websiteUrl": "https://arandialawfirm.com",
+    "privacyUrl": "https://arandialawfirm.com/web/privacy-policy/",
+    "termsOfUseUrl": "https://arandialawfirm.com/web/terms-and-conditions/"
   },
   "icons": {
     "color": "color.png",
@@ -24,7 +24,7 @@
   "accentColor": "#FFFFFF",
   "bots": [
     {
-      "botId": "00000000-0000-0000-0000-000000000000",
+      "botId": "153ad72f-6fa4-4e88-b0fe-f0f785466699",
       "scopes": ["personal", "team", "groupChat"],
       "supportsFiles": true,
       "isNotificationOnly": false,
@@ -51,6 +51,10 @@
       ]
     }
   ],
+  "configurableTabs": [],
+  "staticTabs": [],
+  "connectors": [],
+  "composeExtensions": [],
   "permissions": [
     "identity",
     "messageTeamMembers"
@@ -61,7 +65,7 @@
     "token.botframework.com"
   ],
   "webApplicationInfo": {
-    "id": "00000000-0000-0000-0000-000000000000",
+    "id": "153ad72f-6fa4-4e88-b0fe-f0f785466699",
     "resource": "https://graph.microsoft.com/"
   },
   "authorization": {
@@ -97,4 +101,4 @@
     "groupchat": "bot",
     "meetings": "bot"
   }
-  }
+}

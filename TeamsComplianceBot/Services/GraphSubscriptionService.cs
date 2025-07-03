@@ -145,14 +145,16 @@ public class GraphSubscriptionService : IGraphSubscriptionService
             var statusCode = GetStatusCodeFromServiceException(ex);
             if (statusCode == HttpStatusCode.NotFound)
             {
-                _logger.LogWarning("Subscription {SubscriptionId} not found during renewal attempt - it may have expired", subscriptionId);
+                _logger.LogWarning("⚠️ Subscription {SubscriptionId} not found during renewal attempt - it may have expired and been deleted by Microsoft Graph", subscriptionId);
                 
                 // Delete from our local storage since it doesn't exist anymore
                 await DeleteSubscriptionStorageAsync(subscriptionId, cancellationToken);
+                
+                // Return false so the caller knows the renewal failed and can decide to recreate
                 return false;
             }
             
-            _logger.LogError(ex, "Error renewing subscription: {SubscriptionId}, Status code: {StatusCode}", 
+            _logger.LogError(ex, "❌ Error renewing subscription: {SubscriptionId}, Status code: {StatusCode}", 
                 subscriptionId, statusCode);
             return false;
         }

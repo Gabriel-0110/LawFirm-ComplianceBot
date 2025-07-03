@@ -1,103 +1,54 @@
 # Build results
+bin/
+obj/
 [Dd]ebug/
-[Dd]ebugPublic/
 [Rr]elease/
-[Rr]eleases/
 x64/
 x86/
-[Aa][Rr][Mm]/
-[Aa][Rr][Mm]64/
+build/
 bld/
 [Bb]in/
 [Oo]bj/
-[Ll]og/
-[Ll]ogs/
 
-# Visual Studio files
+# Visual Studio
 .vs/
-*.rsuser
-*.suo
 *.user
+*.suo
 *.userosscache
 *.sln.docstates
 
-# Build results
-*.dll
-*.exe
-*.pdb
-
-# MSTest test Results
-[Tt]est[Rr]esult*/
-[Bb]uild[Ll]og.*
-
-# NUnit
-*.VisualState.xml
-TestResult.xml
-nunit-*.xml
-
-# .NET Core
-project.lock.json
-project.fragment.lock.json
-artifacts/
-
-# ASP.NET Scaffolding
-ScaffoldingReadMe.txt
-
-# Publish results
-publish/
-[Pp]ublish*/
-
-# Azure deployment artifacts
-deploytemp/
-*.zip
+# Secrets and sensitive files
+appsettings.Development.json
+appsettings.Production.json
+*secrets*
+*SECRETS*
+*password*
+*PASSWORD*
+*.pfx
+*.key
+*.pem
+*.cer
+SECRETS-BACKUP-*.txt
+secrets-backup-*.txt
 
 # Environment files
 .env
-appsettings.Development.json
-appsettings.Local.json
+.env.local
+.env.development
+.env.production
 
-# Azure Functions
-local.settings.json
-
-# Test results and logs
-*test-results*.json
-bot-test-results*.json
-production-test-results*.json
-realistic-test.json
-test-payloads.json
-
-# Monitoring and diagnostic scripts (keep for local development)
-*monitor*.ps1
-*test*.ps1
-*diagnostic*.ps1
-comprehensive*.ps1
-
-# Temporary documentation
-PRODUCTION*.md
-DIAGNOSTIC*.md
-DEPLOYMENT*.md
-Teams_Bot_Status*.md
-CALL_JOINING*.md
-
-# SSL certificates (should not be in source control)
-*.cer
-*.key
-*.pem
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Azure CLI files
+# Azure and deployment
+*.azurePubxml
+*.PublishSettings
 .azure/
 
-# Node.js (if any frontend components)
+# Logs
+*.log
+logs/
+
+# Node modules (if any)
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+
+# Temporary files
+*.tmp
+*.temp

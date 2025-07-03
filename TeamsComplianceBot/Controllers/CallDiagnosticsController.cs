@@ -152,7 +152,7 @@ namespace TeamsComplianceBot.Controllers
                         state = "incoming",
                         direction = "incoming",
                         subject = "Test Incoming Call",
-                        callbackUri = "https://arandiabot.ggunifiedtech.com/api/calls",
+                        callbackUri = "https://arandiateamsbot.ggunifiedtech.com/api/calls",
                         source = new
                         {
                             identity = new
@@ -172,7 +172,7 @@ namespace TeamsComplianceBot.Controllers
                         state = "established",
                         direction = "incoming",
                         subject = "Test Established Call",
-                        callbackUri = "https://arandiabot.ggunifiedtech.com/api/calls"
+                        callbackUri = "https://arandiateamsbot.ggunifiedtech.com/api/calls"
                     },
                     // Terminated call
                     new
@@ -181,7 +181,7 @@ namespace TeamsComplianceBot.Controllers
                         state = "terminated",
                         direction = "incoming",
                         subject = "Test Terminated Call",
-                        callbackUri = "https://arandiabot.ggunifiedtech.com/api/calls"
+                        callbackUri = "https://arandiateamsbot.ggunifiedtech.com/api/calls"
                     }
                 };
 
@@ -280,10 +280,10 @@ namespace TeamsComplianceBot.Controllers
                         {
                             "In Azure AD app registration, go to 'Manage' > 'Manifest'",
                             "Find the 'replyUrlsWithType' section",
-                            "Add calling webhook URL: https://arandiabot.ggunifiedtech.com/api/calls",
+                            "Add calling webhook URL: https://arandiateamsbot.ggunifiedtech.com/api/calls",
                             "Save the manifest changes",
                             "Alternatively, use Azure CLI:",
-                            "az ad app update --id 153ad72f-6fa4-4e88-b0fe-f0f785466699 --add replyUrls https://arandiabot.ggunifiedtech.com/api/calls"
+                            "az ad app update --id 153ad72f-6fa4-4e88-b0fe-f0f785466699 --add replyUrls https://arandiateamsbot.ggunifiedtech.com/api/calls"
                         },
                         critical = true
                     },
@@ -299,7 +299,7 @@ namespace TeamsComplianceBot.Controllers
                             "Subscription payload:",
                             "  - resource: /communications/calls",
                             "  - changeType: created,updated,deleted",
-                            "  - notificationUrl: https://arandiabot.ggunifiedtech.com/api/notifications",
+                            "  - notificationUrl: https://arandiateamsbot.ggunifiedtech.com/api/notifications",
                             "  - expirationDateTime: (set appropriate expiration)",
                             "Test the subscription endpoint is accessible"
                         },
@@ -312,9 +312,9 @@ namespace TeamsComplianceBot.Controllers
                         description = "Verify all endpoints are working correctly",
                         actions = new[]
                         {
-                            "Test bot message endpoint: GET https://arandiabot.ggunifiedtech.com/api/messages",
-                            "Test calls endpoint: GET https://arandiabot.ggunifiedtech.com/api/calls/health",
-                            "Test notifications endpoint: GET https://arandiabot.ggunifiedtech.com/api/notifications",
+                            "Test bot message endpoint: GET https://arandiateamsbot.ggunifiedtech.com/api/messages",
+                            "Test calls endpoint: GET https://arandiateamsbot.ggunifiedtech.com/api/calls/health",
+                            "Test notifications endpoint: GET https://arandiateamsbot.ggunifiedtech.com/api/notifications",
                             "All should return proper HTTP status codes",
                             "Check application logs for any errors"
                         },

@@ -42,7 +42,7 @@ namespace TeamsComplianceBot.Controllers
             {
                 _logger.LogInformation("Creating extended call records subscription (24 hours)");
 
-                var notificationUrl = "https://arandiabot.ggunifiedtech.com/api/notifications";
+                var notificationUrl = "https://arandiateamsbot.ggunifiedtech.com/api/notifications";
                 
                 _logger.LogInformation("Creating call records subscription with URL: {NotificationUrl}", notificationUrl);
 
@@ -121,7 +121,7 @@ namespace TeamsComplianceBot.Controllers
             {
                 _logger.LogInformation("Creating live calls subscription with new permissions");
 
-                var notificationUrl = "https://arandiabot.ggunifiedtech.com/api/notifications";
+                var notificationUrl = "https://arandiateamsbot.ggunifiedtech.com/api/notifications";
                 
                 var subscription = new Microsoft.Graph.Models.Subscription
                 {
@@ -211,7 +211,7 @@ namespace TeamsComplianceBot.Controllers
             {
                 _logger.LogInformation("Creating online meetings subscription with corrected permissions");
 
-                var notificationUrl = "https://arandiabot.ggunifiedtech.com/api/notifications";
+                var notificationUrl = "https://arandiateamsbot.ggunifiedtech.com/api/notifications";
                 
                 var subscription = new Microsoft.Graph.Models.Subscription
                 {
@@ -301,7 +301,7 @@ namespace TeamsComplianceBot.Controllers
             {
                 _logger.LogInformation("Creating all Teams subscriptions with newly granted permissions");
 
-                var notificationUrl = "https://arandiabot.ggunifiedtech.com/api/notifications";
+                var notificationUrl = "https://arandiateamsbot.ggunifiedtech.com/api/notifications";
                 var results = new List<object>();
                 
                 var subscriptionRequests = new[]
