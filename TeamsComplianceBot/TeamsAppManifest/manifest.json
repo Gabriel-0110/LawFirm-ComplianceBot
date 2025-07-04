@@ -66,7 +66,7 @@
   ],
   "webApplicationInfo": {
     "id": "153ad72f-6fa4-4e88-b0fe-f0f785466699",
-    "resource": "https://graph.microsoft.com/"
+    "resource": "api://arandialawfirm.com/153ad72f-6fa4-4e88-b0fe-f0f785466699"
   },
   "authorization": {
     "permissions": {
