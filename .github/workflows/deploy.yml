@@ -70,14 +70,53 @@ jobs:
           "MicrosoftAppId=${{ secrets.MICROSOFT_APP_ID }}" `
           "MicrosoftAppPassword=${{ secrets.MICROSOFT_APP_PASSWORD }}" `
           "MicrosoftAppTenantId=${{ secrets.MICROSOFT_APP_TENANT_ID }}" `
+          "MicrosoftAppType=MultiTenant" `
+          "AzureAd__Instance=https://login.microsoftonline.com/" `
           "AzureAd__TenantId=${{ secrets.MICROSOFT_APP_TENANT_ID }}" `
           "AzureAd__ClientId=${{ secrets.MICROSOFT_APP_ID }}" `
           "AzureAd__ClientSecret=${{ secrets.MICROSOFT_APP_PASSWORD }}" `
           "ConnectionStrings__BlobStorage=${{ secrets.BLOB_STORAGE_CONNECTION_STRING }}" `
           "ConnectionStrings__ApplicationInsights=${{ secrets.APPLICATION_INSIGHTS_CONNECTION_STRING }}" `
+          "Azure__StorageAccount=arandiabotstorage" `
+          "Recording__AutoStartRecording=true" `
+          "Recording__NotifyParticipants=true" `
           "Recording__NotificationUrl=https://arandiateamsbot.ggunifiedtech.com/api/notifications" `
           "Recording__NotificationClientState=${{ secrets.NOTIFICATION_CLIENT_STATE }}" `
-          "Bot__CallbackUrl=https://arandiateamsbot.ggunifiedtech.com/api/calls"
+          "Recording__SubscriptionRenewalMinutes=60" `
+          "Recording__PollingIntervalSeconds=15" `
+          "Recording__MaxPollingAttempts=20" `
+          "Recording__IncludeVideo=true" `
+          "Recording__IncludeAudio=true" `
+          "Recording__GenerateTranscription=true" `
+          "Recording__VideoQuality=HD" `
+          "Recording__AudioQuality=High" `
+          "Recording__MaxRecordingLengthMinutes=480" `
+          "Storage__MaxSizeBytes=1000000000000" `
+          "Storage__ConnectionString=${{ secrets.BLOB_STORAGE_CONNECTION_STRING }}" `
+          "ApplicationInsights__ConnectionString=${{ secrets.APPLICATION_INSIGHTS_CONNECTION_STRING }}" `
+          "Compliance__DefaultRetentionDays=2555" `
+          "Compliance__AutoDelete=true" `
+          "Compliance__PolicyVersion=1.0" `
+          "Compliance__AdminUsers__0=@arandialawfirm.com" `
+          "Compliance__AdminUsers__1=admin@arandialawfirm.com" `
+          "Compliance__SuperAdminUsers__0=gabriel@arandialawfirm.com" `
+          "Compliance__ViewerUsers__0=viewer@arandialawfirm.com" `
+          "Notifications__RecordingStarted=true" `
+          "Notifications__RecordingCompleted=true" `
+          "Notifications__ComplianceAlerts=true" `
+          "Notifications__AdminRecordingAlerts=true" `
+          "Bot__CallbackUrl=https://arandiateamsbot.ggunifiedtech.com/api/calls" `
+          "AllowedHosts=*"
+    
+    - name: Configure Custom Domain Settings
+      shell: pwsh
+      run: |
+        # Configure CORS for the custom domain
+        az webapp cors add --name "${{ env.AZURE_WEBAPP_NAME }}" --resource-group "Arandia-Apps" --allowed-origins "https://arandiateamsbot.ggunifiedtech.com"
+        
+        # Set the default hostname binding
+        Write-Host "Custom domain should be configured manually in Azure Portal if not already done"
+        Write-Host "Domain: arandiateamsbot.ggunifiedtech.com should point to: teamsbot-cxawdtgqcqh2a3hd.eastus2-01.azurewebsites.net"
     
     - name: Restart Web App
       shell: pwsh
