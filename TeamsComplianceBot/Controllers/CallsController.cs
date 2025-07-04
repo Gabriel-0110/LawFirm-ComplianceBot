@@ -834,10 +834,47 @@ namespace TeamsComplianceBot.Controllers
                 _logger.LogInformation("Updating recording status to '{Status}' for call {CallId} (correlation: {CorrelationId})", status, callId, correlationId);
 
                 // TODO: Implement actual Microsoft Graph API call to updateRecordingStatus
-                // This should use the Microsoft Graph SDK to call:
-                // PATCH /communications/calls/{call-id}/updateRecordingStatus
-                // Body: { "status": "recording" | "notRecording" }
-
+                // IMPLEMENTATION REQUIRED:
+                // 
+                // 1. Add Microsoft Graph SDK NuGet package:
+                //    Microsoft.Graph
+                //    Microsoft.Graph.Auth
+                //
+                // 2. Configure Graph client with appropriate authentication:
+                //    - Use managed identity or service principal
+                //    - Ensure proper scopes: Calls.AccessMedia.All, Calls.Initiate.All
+                //
+                // 3. Make the actual API call:
+                //    PATCH /communications/calls/{call-id}/updateRecordingStatus
+                //    Headers: Authorization: Bearer {token}
+                //    Body: { "status": "recording" | "notRecording" }
+                //
+                // 4. Example implementation:
+                //    var graphServiceClient = GetGraphServiceClient();
+                //    var updateRecordingStatusRequest = new UpdateRecordingStatusRequest
+                //    {
+                //        Status = status // "recording" or "notRecording"
+                //    };
+                //    var response = await graphServiceClient.Communications.Calls[callId]
+                //        .UpdateRecordingStatus(updateRecordingStatusRequest)
+                //        .Request()
+                //        .PostAsync();
+                //
+                // 5. Handle Graph API responses:
+                //    - Success: 200 OK with operation ID
+                //    - Failure: 4xx/5xx with error details
+                //    - Implement retry logic for transient failures
+                //
+                // 6. Security considerations:
+                //    - Store credentials in Azure Key Vault
+                //    - Use managed identity where possible
+                //    - Implement proper token caching and refresh
+                //
+                // COMPLIANCE NOTES:
+                // - This API call is MANDATORY before recording per Microsoft documentation
+                // - Failure to call this API violates Microsoft Graph Media Access API terms
+                // - Must receive success response before proceeding with actual recording
+                
                 // For now, simulate the API call
                 await Task.Delay(100); // Simulate API call delay
 
@@ -847,13 +884,14 @@ namespace TeamsComplianceBot.Controllers
                     ["CallId"] = callId,
                     ["Status"] = status,
                     ["CorrelationId"] = correlationId,
-                    ["Timestamp"] = DateTimeOffset.UtcNow.ToString()
+                    ["Timestamp"] = DateTimeOffset.UtcNow.ToString(),
+                    ["Implementation"] = "SIMULATED - REQUIRES_GRAPH_SDK"
                 });
 
-                _logger.LogInformation("Recording status update simulated successfully for call {CallId} with status '{Status}'", callId, status);
+                _logger.LogWarning("⚠️  Recording status update simulated for call {CallId} with status '{Status}' - IMPLEMENT ACTUAL GRAPH API CALL", callId, status);
                 
                 // TODO: Replace this simulation with actual Graph API implementation
-                return (true, $"Recording status updated to {status}");
+                return (true, $"Recording status updated to {status} (SIMULATED)");
             }
             catch (Exception ex)
             {
