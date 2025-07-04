@@ -1,6 +1,40 @@
-# Teams Compliance Bot
+# 🤖 Teams Compliance Bot - GitHub Deployment Ready
 
-A Microsoft Teams bot for compliance recording of calls and meetings with secure audio/video capture, storage, transcription, and alerting aligned with regulatory standards.
+A Microsoft Teams bot for compliance recording that **automatically joins calls** and records them with secure storage, Microsoft Graph integration, and full compliance features.
+
+## 🚀 Recent Critical Fixes
+
+- **✅ Compilation errors fixed** - Code now builds successfully
+- **✅ Automatic call joining** - Bot receives webhooks and joins calls automatically  
+- **✅ Graph subscriptions** - Real-time notifications when calls start
+- **✅ Enhanced services** - All missing components implemented
+- **✅ GitHub deployment** - Ready for CI/CD deployment
+
+## 🔧 GitHub Secrets Required
+
+Set these in GitHub Settings → Secrets and variables → Actions:
+
+### Core Bot Configuration
+```
+MICROSOFT_APP_ID
+MICROSOFT_APP_PASSWORD  
+MICROSOFT_APP_TENANT_ID
+```
+
+### Azure Deployment
+```
+AZURE_CREDENTIALS
+AZURE_RESOURCE_GROUP
+```
+
+### Storage & Endpoints
+```
+BLOB_STORAGE_CONNECTION_STRING
+APPLICATION_INSIGHTS_CONNECTION_STRING
+BOT_NOTIFICATION_URL
+BOT_CALLBACK_URL
+NOTIFICATION_CLIENT_STATE
+```
 
 ## Features
 

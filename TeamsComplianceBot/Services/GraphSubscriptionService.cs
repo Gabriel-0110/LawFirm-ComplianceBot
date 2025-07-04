@@ -62,40 +62,24 @@ public class GraphSubscriptionService : IGraphSubscriptionService
                 ExpirationDateTime = DateTimeOffset.UtcNow.AddMinutes(subscriptionRenewalMinutes),
                 ClientState = subscriptionClientState,
                 LifecycleNotificationUrl = notificationUrl // Also receive lifecycle notifications at the same endpoint
-            };            // Create the subscription via Graph API
-            _logger.LogInformation("Attempting to create subscription via Graph API - Resource: {Resource}, ChangeType: {ChangeType}, NotificationUrl: {NotificationUrl}", 
-                resource, changeType, notificationUrl);
-            
-            try
+            };
+
+            // Create the subscription via Graph API
+            var createdSubscription = await _graphClient.Subscriptions
+                .PostAsync(subscription, cancellationToken: cancellationToken);
+
+            if (createdSubscription == null || string.IsNullOrEmpty(createdSubscription.Id))
             {
-                var createdSubscription = await _graphClient.Subscriptions
-                    .PostAsync(subscription, cancellationToken: cancellationToken);
-
-                if (createdSubscription == null || string.IsNullOrEmpty(createdSubscription.Id))
-                {
-                    throw new InvalidOperationException("Failed to create subscription - null or empty subscription ID returned");
-                }
-
-                // Store the subscription details in blob storage for tracking
-                await StoreSubscriptionAsync(createdSubscription, cancellationToken);
-
-                _logger.LogInformation("Created subscription: {SubscriptionId} for resource: {Resource}, expires: {ExpirationTime}", 
-                    createdSubscription.Id, resource, createdSubscription.ExpirationDateTime);
-
-                return createdSubscription.Id;
+                throw new InvalidOperationException("Failed to create subscription - null or empty subscription ID returned");
             }
-            catch (HttpRequestException httpEx)
-            {
-                _logger.LogError(httpEx, "HTTP error creating subscription for resource: {Resource}. Inner exception: {InnerException}", 
-                    resource, httpEx.InnerException?.Message);
-                throw;
-            }
-            catch (System.Net.WebException webEx)
-            {
-                _logger.LogError(webEx, "Web exception creating subscription for resource: {Resource}. Status: {Status}", 
-                    resource, webEx.Status);
-                throw;
-            }
+
+            // Store the subscription details in blob storage for tracking
+            await StoreSubscriptionAsync(createdSubscription, cancellationToken);
+
+            _logger.LogInformation("Created subscription: {SubscriptionId} for resource: {Resource}, expires: {ExpirationTime}", 
+                createdSubscription.Id, resource, createdSubscription.ExpirationDateTime);
+
+            return createdSubscription.Id;
         }
         catch (Exception ex)
         {
@@ -145,16 +129,14 @@ public class GraphSubscriptionService : IGraphSubscriptionService
             var statusCode = GetStatusCodeFromServiceException(ex);
             if (statusCode == HttpStatusCode.NotFound)
             {
-                _logger.LogWarning("⚠️ Subscription {SubscriptionId} not found during renewal attempt - it may have expired and been deleted by Microsoft Graph", subscriptionId);
+                _logger.LogWarning("Subscription {SubscriptionId} not found during renewal attempt - it may have expired", subscriptionId);
                 
                 // Delete from our local storage since it doesn't exist anymore
                 await DeleteSubscriptionStorageAsync(subscriptionId, cancellationToken);
-                
-                // Return false so the caller knows the renewal failed and can decide to recreate
                 return false;
             }
             
-            _logger.LogError(ex, "❌ Error renewing subscription: {SubscriptionId}, Status code: {StatusCode}", 
+            _logger.LogError(ex, "Error renewing subscription: {SubscriptionId}, Status code: {StatusCode}", 
                 subscriptionId, statusCode);
             return false;
         }

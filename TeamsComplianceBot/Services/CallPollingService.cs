@@ -227,7 +227,7 @@ namespace TeamsComplianceBot.Services
             }
         }
 
-        private async Task ProcessCallForRecordingAsync(Call call)
+        private Task ProcessCallForRecordingAsync(Call call)
         {
             try
             {
@@ -242,6 +242,8 @@ namespace TeamsComplianceBot.Services
             {
                 _logger.LogError(ex, "Error processing call {CallId} for recording", call.Id);
             }
+            
+            return Task.CompletedTask;
         }
 
         private async Task ProcessCallRecordAsync(Microsoft.Graph.Models.CallRecords.CallRecord callRecord)
@@ -259,8 +261,7 @@ namespace TeamsComplianceBot.Services
                         callRecord.Organizer.User.Id);
                     
                     // Here we would check compliance requirements and process accordingly
-                    // For now, we'll log the call for compliance tracking
-                    await _callRecordingService.ProcessCallRecordForComplianceAsync(callRecord);
+                    await _callRecordingService.ProcessCallRecordForComplianceAsync(callRecord.Id ?? string.Empty);
                 }
             }
             catch (Exception ex)

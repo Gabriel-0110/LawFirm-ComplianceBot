@@ -271,85 +271,12 @@ builder.Services.AddSingleton<ConversationState>();
 builder.Services.AddTransient<IBot, TeamsComplianceBot.Bots.TeamsComplianceBot>();
 builder.Services.AddTransient<TeamsComplianceBot.Bots.TeamsComplianceBot>();
 
-// Register compliance services - Changed from Singleton to Scoped to allow injection of scoped services
-builder.Services.AddScoped<ICallPollingService, CallPollingService>();
-
-// Configure HTTP client for Graph API with enhanced SSL/TLS handling
-builder.Services.AddHttpClient("GraphClient", client =>
-{
-    client.Timeout = TimeSpan.FromMinutes(5);
-    client.DefaultRequestHeaders.Add("User-Agent", "TeamsComplianceBot/1.0");
-}).ConfigurePrimaryHttpMessageHandler(() =>
-{
-    var handler = new HttpClientHandler();
-    
-    // Configure SSL/TLS settings for Azure environments
-    handler.ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) =>
-    {
-        // For debugging purposes, log certificate details
-        Console.WriteLine($"SSL Validation - Policy Errors: {sslPolicyErrors}");
-        if (cert != null)
-        {
-            Console.WriteLine($"SSL Validation - Certificate Subject: {cert.Subject}");
-            Console.WriteLine($"SSL Validation - Certificate Issuer: {cert.Issuer}");
-        }
-        
-        // If there are no SSL policy errors, certificate is valid
-        if (sslPolicyErrors == System.Net.Security.SslPolicyErrors.None)
-        {
-            Console.WriteLine("SSL certificate validation passed - No errors");
-            return true;
-        }
-        
-        // For Microsoft endpoints, be more permissive but still check for critical issues
-        if (cert != null)
-        {
-            var subject = cert.Subject?.ToLowerInvariant() ?? "";
-            var issuer = cert.Issuer?.ToLowerInvariant() ?? "";
-            
-            // Check if this is a Microsoft/Azure certificate
-            var isMicrosoftCert = subject.Contains("microsoft.com") || 
-                                subject.Contains("graph.microsoft.com") ||
-                                subject.Contains("login.microsoftonline.com") ||
-                                subject.Contains("azure.com") ||
-                                issuer.Contains("microsoft") ||
-                                issuer.Contains("digicert") ||
-                                issuer.Contains("baltimore") ||
-                                issuer.Contains("cybertrust");
-                                
-            if (isMicrosoftCert)
-            {
-                // For Microsoft certificates, only reject if there are critical errors
-                var hasCriticalErrors = sslPolicyErrors.HasFlag(System.Net.Security.SslPolicyErrors.RemoteCertificateNotAvailable) ||
-                                      (chain?.ChainStatus?.Any(status => status.Status == System.Security.Cryptography.X509Certificates.X509ChainStatusFlags.Revoked) ?? false);
-                
-                if (!hasCriticalErrors)
-                {
-                    Console.WriteLine($"Allowing Microsoft certificate despite minor SSL policy errors: {sslPolicyErrors}");
-                    return true;
-                }
-            }
-        }
-        
-        Console.WriteLine($"SSL certificate validation failed with errors: {sslPolicyErrors}");
-        return false;
-    };
-    
-    // Enable all modern TLS versions
-    handler.SslProtocols = System.Security.Authentication.SslProtocols.Tls12 | System.Security.Authentication.SslProtocols.Tls13;
-    
-    return handler;
-});
-
-// Configure Microsoft Graph with enhanced error handling
+// Configure Microsoft Graph
 builder.Services.AddSingleton<GraphServiceClient>(provider =>
 {
     var tenantId = builder.Configuration["AzureAd:TenantId"];
     var clientId = builder.Configuration["AzureAd:ClientId"];
     var clientSecret = builder.Configuration["AzureAd:ClientSecret"];
-    var httpClientFactory = provider.GetRequiredService<IHttpClientFactory>();
-
-    Console.WriteLine($"Configuring GraphServiceClient - TenantId: {tenantId?.Substring(0, 8)}..., ClientId: {clientId?.Substring(0, 8)}...");
 
     // Check if required values are missing
     if (string.IsNullOrEmpty(tenantId) || string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret))
@@ -360,21 +287,17 @@ builder.Services.AddSingleton<GraphServiceClient>(provider =>
         try
         {
             var defaultCredential = new DefaultAzureCredential();
-            var httpClient = httpClientFactory.CreateClient("GraphClient");
-            Console.WriteLine("Using DefaultAzureCredential with custom HttpClient");
-            return new GraphServiceClient(httpClient, defaultCredential);
+            return new GraphServiceClient(defaultCredential);
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine($"Failed to initialize GraphServiceClient with DefaultAzureCredential: {ex.Message}");
+            Console.WriteLine("Failed to initialize GraphServiceClient with DefaultAzureCredential.");
             throw new InvalidOperationException("Azure AD credentials not configured and DefaultAzureCredential failed.");
         }
     }
 
     var credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
-    var customHttpClient = httpClientFactory.CreateClient("GraphClient");
-    Console.WriteLine("Using ClientSecretCredential with custom HttpClient");
-    return new GraphServiceClient(customHttpClient, credential);
+    return new GraphServiceClient(credential);
 });
 
 // Configure Azure Blob Storage for recordings with enhanced versioning and error handling
@@ -465,17 +388,14 @@ builder.Services.AddSingleton<IGraphSubscriptionService, GraphSubscriptionServic
 // Register the subscription renewal background service
 builder.Services.AddHostedService<SubscriptionRenewalService>();
 
+// Register the subscription setup service to create initial subscriptions
+builder.Services.AddHostedService<SubscriptionSetupService>();
+
 // Register custom services
 builder.Services.AddScoped<ICallRecordingService, CallRecordingService>();
 builder.Services.AddScoped<IComplianceService, ComplianceService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
-builder.Services.AddScoped<ICallJoiningService>(provider =>
-{
-    var graphClient = provider.GetRequiredService<GraphServiceClient>();
-    var logger = provider.GetRequiredService<ILogger<CallJoiningService>>();
-    var configuration = provider.GetRequiredService<IConfiguration>();
-    return new CallJoiningService(graphClient, logger, configuration);
-});
+builder.Services.AddScoped<ICallJoiningService, CallJoiningService>();
 
 // Add health checks with improved blob storage checks
 builder.Services.AddHealthChecks()
@@ -509,12 +429,6 @@ builder.Services.AddHealthChecks()
             return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy("Blob storage is not accessible", ex);
         }
     });
-builder.Services.AddAzureClients(clientBuilder =>
-{
-    clientBuilder.AddBlobServiceClient(builder.Configuration["StorageConnection:blobServiceUri"]!).WithName("StorageConnection");
-    clientBuilder.AddQueueServiceClient(builder.Configuration["StorageConnection:queueServiceUri"]!).WithName("StorageConnection");
-    clientBuilder.AddTableServiceClient(builder.Configuration["StorageConnection:tableServiceUri"]!).WithName("StorageConnection");
-});
 
 var app = builder.Build();
 

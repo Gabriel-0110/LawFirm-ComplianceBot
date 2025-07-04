@@ -7,11 +7,11 @@ on:
 
 env:
   AZURE_WEBAPP_NAME: 'teamsbot'
-  AZURE_WEBAPP_PACKAGE_PATH: './publish'
-  DOTNET_VERSION: '9.0'
+  AZURE_WEBAPP_PACKAGE_PATH: './TeamsComplianceBot'
+  DOTNET_VERSION: '8.0'
 
 jobs:
-  build-and-deploy:
+  build-and-test:
     runs-on: windows-latest
     
     steps:
@@ -23,42 +23,74 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
     
     - name: Restore dependencies
-      run: dotnet restore "TeamsComplianceBot/TeamsComplianceBot.csproj"
-    
+      run: dotnet restore
+      
     - name: Build
-      run: dotnet build "TeamsComplianceBot/TeamsComplianceBot.csproj" --configuration Release --no-restore
-    
+      run: dotnet build --no-restore --configuration Release
+      
+    - name: Test
+      run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+      
     - name: Publish
-      run: dotnet publish "TeamsComplianceBot/TeamsComplianceBot.csproj" --configuration Release --no-build --output ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+      run: dotnet publish ${{ env.AZURE_WEBAPP_PACKAGE_PATH }} --configuration Release --output ./publish
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: webapp
+        path: ./publish
+
+  deploy:
+    runs-on: windows-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
     
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: webapp
+        path: ./publish
+        
     - name: Azure Login
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
-    
+        
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
       with:
         app-name: ${{ env.AZURE_WEBAPP_NAME }}
-        package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+        package: ./publish
     
-    - name: Configure App Settings
-      shell: bash
+    - name: Configure App Settings from Secrets
+      shell: pwsh
       run: |
-        az webapp config appsettings set --name "${{ env.AZURE_WEBAPP_NAME }}" --resource-group "Arandia-Apps" --settings @deploy-settings.json
-      continue-on-error: true
+        az webapp config appsettings set --name "${{ env.AZURE_WEBAPP_NAME }}" --resource-group "Arandia-Apps" --settings `
+          "MicrosoftAppId=${{ secrets.MICROSOFT_APP_ID }}" `
+          "MicrosoftAppPassword=${{ secrets.MICROSOFT_APP_PASSWORD }}" `
+          "MicrosoftAppTenantId=${{ secrets.MICROSOFT_APP_TENANT_ID }}" `
+          "AzureAd__TenantId=${{ secrets.MICROSOFT_APP_TENANT_ID }}" `
+          "AzureAd__ClientId=${{ secrets.MICROSOFT_APP_ID }}" `
+          "AzureAd__ClientSecret=${{ secrets.MICROSOFT_APP_PASSWORD }}" `
+          "ConnectionStrings__BlobStorage=${{ secrets.BLOB_STORAGE_CONNECTION_STRING }}" `
+          "ConnectionStrings__ApplicationInsights=${{ secrets.APPLICATION_INSIGHTS_CONNECTION_STRING }}" `
+          "Recording__NotificationUrl=https://arandiateamsbot.ggunifiedtech.com/api/notifications" `
+          "Recording__NotificationClientState=${{ secrets.NOTIFICATION_CLIENT_STATE }}" `
+          "Bot__CallbackUrl=https://arandiateamsbot.ggunifiedtech.com/api/calls"
     
     - name: Restart Web App
-      shell: bash
+      shell: pwsh
       run: |
         az webapp restart --name "${{ env.AZURE_WEBAPP_NAME }}" --resource-group "Arandia-Apps"
     
     - name: Deployment Summary
       run: |
-        echo "🚀 Deployment completed successfully!"
-        echo "📊 Application Insights 404 renewal errors should be fixed"
-        echo "🔧 New subscription management endpoints available"
-        echo "🌐 Updated domain URLs: arandiateamsbot.ggunifiedtech.com"
+        echo "🚀 Teams Compliance Bot deployed successfully!"
+        echo "📊 NotificationsController configured for automatic call joining"
+        echo "🔧 Enhanced webhook handling for Graph subscriptions"
+        echo "🌐 Bot URL: https://arandiateamsbot.ggunifiedtech.com"
+        echo "📋 Webhook endpoint: https://arandiateamsbot.ggunifiedtech.com/api/notifications"
         echo ""
         echo "🔗 Test endpoints after deployment:"
         echo "- https://arandiateamsbot.ggunifiedtech.com/api/subscriptions/fix-renewal-errors"

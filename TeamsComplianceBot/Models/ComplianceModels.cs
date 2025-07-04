@@ -580,6 +580,10 @@ public enum ComplianceEventType
     ParticipantJoined,
     ParticipantLeft,
     
+    // Call lifecycle events
+    CallJoined,
+    CallEnded,
+    
     // Administrative events
     PolicyUpdated,
     UserPermissionChanged,

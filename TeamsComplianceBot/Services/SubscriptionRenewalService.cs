@@ -102,27 +102,18 @@ public class SubscriptionRenewalService : BackgroundService
                     if (renewalResult)
                     {
                         renewedCount++;
-                        _logger.LogInformation("✅ Successfully renewed subscription {SubscriptionId}", subscription.Id);
+                        _logger.LogInformation("Successfully renewed subscription {SubscriptionId}", subscription.Id);
                     }
                     else
                     {
                         failedCount++;
-                        _logger.LogWarning("⚠️ Failed to renew subscription {SubscriptionId} - may need recreation", subscription.Id);
-                        
-                        // TODO: Consider implementing automatic recreation logic here
-                        // For now, we'll log the failure and let the manual recreation endpoint handle it
+                        _logger.LogWarning("Failed to renew subscription {SubscriptionId}", subscription.Id);
                     }
                 }
                 catch (Exception ex)
                 {
                     failedCount++;
-                    _logger.LogError(ex, "❌ Error renewing subscription {SubscriptionId}", subscription.Id);
-                    
-                    // If this is a not found error, the subscription was probably deleted
-                    if (ex.Message.Contains("NotFound") || ex.Message.Contains("404"))
-                    {
-                        _logger.LogWarning("🔄 Subscription {SubscriptionId} appears to be deleted - consider recreation", subscription.Id);
-                    }
+                    _logger.LogError(ex, "Error renewing subscription {SubscriptionId}", subscription.Id);
                 }
             }
 

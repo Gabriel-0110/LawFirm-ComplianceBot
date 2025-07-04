@@ -24,6 +24,7 @@ public class NotificationsController : ControllerBase
     private readonly ICallRecordingService _recordingService;
     private readonly IComplianceService _complianceService;
     private readonly IGraphSubscriptionService? _subscriptionService;
+    private readonly ICallJoiningService _callJoiningService;
     private readonly TelemetryClient _telemetryClient;
 
     // Security and monitoring
@@ -38,6 +39,7 @@ public class NotificationsController : ControllerBase
         IConfiguration configuration,
         ICallRecordingService recordingService,
         IComplianceService complianceService,
+        ICallJoiningService callJoiningService,
         TelemetryClient telemetryClient,
         IGraphSubscriptionService? subscriptionService = null) // Optional dependency
     {
@@ -45,6 +47,7 @@ public class NotificationsController : ControllerBase
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _recordingService = recordingService ?? throw new ArgumentNullException(nameof(recordingService));
         _complianceService = complianceService ?? throw new ArgumentNullException(nameof(complianceService));
+        _callJoiningService = callJoiningService ?? throw new ArgumentNullException(nameof(callJoiningService));
         _telemetryClient = telemetryClient ?? throw new ArgumentNullException(nameof(telemetryClient));
         _subscriptionService = subscriptionService; // May be null if not registered
     }
@@ -59,172 +62,120 @@ public IActionResult Get()
 {
     try
     {
-        _logger.LogInformation("=== WEBHOOK VALIDATION REQUEST RECEIVED ===");
-        _logger.LogInformation("Request Method: {Method}", Request.Method);
-        _logger.LogInformation("Request Path: {Path}", Request.Path);
-        _logger.LogInformation("Request Query String: {QueryString}", Request.QueryString);
-          // Log all headers
-        foreach (var header in Request.Headers)
-        {
-            var headerValues = header.Value.ToArray();
-            _logger.LogInformation("Header: {Key} = {Value}", header.Key, string.Join(", ", headerValues));
-        }
-        
-        // Log all query parameters
-        foreach (var query in Request.Query)
-        {
-            var queryValues = query.Value.ToArray();
-            _logger.LogInformation("Query Parameter: {Key} = {Value}", query.Key, string.Join(", ", queryValues));
-        }
+        _logger.LogInformation("Received GET request to webhook endpoint");
 
         // Get the validation token from the query string
         var validationToken = Request.Query["validationToken"].FirstOrDefault();
 
         if (string.IsNullOrEmpty(validationToken))
         {
-            _logger.LogWarning("=== VALIDATION FAILED: No validationToken query parameter ===");
+            _logger.LogWarning("GET request without validationToken query parameter");
             return BadRequest("GET requests require a validationToken query parameter for Graph validation");
         }
 
-        _logger.LogInformation("=== VALIDATION SUCCESS: Returning token ===");
-        _logger.LogInformation("Validation Token: {ValidationToken}", validationToken);
-        _logger.LogInformation("Response Content-Type: text/plain");
-        _logger.LogInformation("Response Status: 200 OK");
+        _logger.LogInformation("Received Graph validation request with token: {ValidationTokenPreview}...",
+            validationToken.Length > 10 ? validationToken.Substring(0, 10) + "..." : validationToken);
 
-        var response = Content(validationToken, "text/plain");
-        _logger.LogInformation("=== VALIDATION RESPONSE SENT ===");
-        
-        return response;
+        return Content(validationToken, "text/plain");
     }
     catch (Exception ex)
     {
-        _logger.LogError(ex, "=== VALIDATION ERROR: Exception occurred ===");
+        _logger.LogError(ex, "Error processing GET validation request");
         return StatusCode(500, "An error occurred while processing the validation request");
     }
 }
 
 /// <summary>
 /// POST endpoint for handling Microsoft Graph API notifications with enhanced security and compliance
-/// Processes validation requests (with validationToken query parameter) and actual notification events
+/// Processes actual notification events sent after subscription validation
 /// </summary>
 [HttpPost]
-[Produces("text/plain")]
-public async Task<IActionResult> Post()
-{
-    var correlationId = HttpContext.Request.Headers[CORRELATION_ID_HEADER].FirstOrDefault() 
-                       ?? Guid.NewGuid().ToString();
-
-    using var activity = ActivitySource.StartActivity("GraphNotification.Process");
-    activity?.SetTag("correlation.id", correlationId);
-    activity?.SetTag("remote.address", HttpContext.Connection.RemoteIpAddress?.ToString());
-
-    using var operation = _telemetryClient.StartOperation<RequestTelemetry>("Graph Notification Processing");
-    operation.Telemetry.Properties["CorrelationId"] = correlationId;
-    operation.Telemetry.Properties["RemoteIpAddress"] = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
-
-    try
+    public async Task<IActionResult> Post()
     {
-        _logger.LogInformation("=== POST REQUEST RECEIVED ===");
-        _logger.LogInformation("Correlation ID: {CorrelationId}", correlationId);
-        _logger.LogInformation("Request Method: {Method}", Request.Method);
-        _logger.LogInformation("Request Path: {Path}", Request.Path);
-        _logger.LogInformation("Request Query String: {QueryString}", Request.QueryString);
-        _logger.LogInformation("Content Length: {ContentLength}", Request.ContentLength);
-        
-        // Log all headers
-        foreach (var header in Request.Headers)
-        {
-            var headerValues = header.Value.ToArray();
-            _logger.LogInformation("Header: {Key} = {Value}", header.Key, string.Join(", ", headerValues));
-        }
-        
-        // Log all query parameters
-        foreach (var query in Request.Query)
-        {
-            var queryValues = query.Value.ToArray();
-            _logger.LogInformation("Query Parameter: {Key} = {Value}", query.Key, string.Join(", ", queryValues));
-        }
+        var correlationId = HttpContext.Request.Headers[CORRELATION_ID_HEADER].FirstOrDefault() 
+                           ?? Guid.NewGuid().ToString();
 
-        // *** CRITICAL FIX: Check for validationToken query parameter first ***
-        // Microsoft Graph sends POST requests with validationToken as query parameter for validation
-        var validationToken = Request.Query["validationToken"].FirstOrDefault();
-        if (!string.IsNullOrEmpty(validationToken))
+        using var activity = ActivitySource.StartActivity("GraphNotification.Process");
+        activity?.SetTag("correlation.id", correlationId);
+        activity?.SetTag("remote.address", HttpContext.Connection.RemoteIpAddress?.ToString());
+
+        using var operation = _telemetryClient.StartOperation<RequestTelemetry>("Graph Notification Processing");
+        operation.Telemetry.Properties["CorrelationId"] = correlationId;
+        operation.Telemetry.Properties["RemoteIpAddress"] = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+
+        try
         {
-            _logger.LogInformation("=== WEBHOOK VALIDATION (POST) ===");
-            _logger.LogInformation("ValidationToken found in query parameter: {ValidationToken}", validationToken);
-            _logger.LogInformation("Responding with plain text validation token");
+            _logger.LogInformation("Received POST notification from Microsoft Graph with correlation ID {CorrelationId}", correlationId);
+
+            // Security validation
+            if (!ValidateNotificationRequest())
+            {
+                _logger.LogWarning("Graph notification request validation failed from {RemoteIpAddress}", 
+                    HttpContext.Connection.RemoteIpAddress?.ToString());
+                return BadRequest("Invalid request");
+            }
+
+            // Content length validation
+            if (Request.ContentLength > MAX_REQUEST_SIZE)
+            {
+                _logger.LogWarning("Graph notification request too large: {ContentLength} bytes from {RemoteIpAddress}", 
+                    Request.ContentLength, HttpContext.Connection.RemoteIpAddress?.ToString());
+                return BadRequest("Request too large");
+            }
+
+            // Add correlation ID to response headers for traceability
+            HttpContext.Response.Headers.Append(CORRELATION_ID_HEADER, correlationId);
+
+            // Enhanced logging for compliance
+            var scopeProperties = new Dictionary<string, object?>
+            {
+                ["CorrelationId"] = correlationId,
+                ["Operation"] = "GraphNotificationProcessing",
+                ["RemoteIpAddress"] = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown",
+                ["UserAgent"] = HttpContext.Request.Headers.UserAgent.ToString(),
+                ["Timestamp"] = DateTimeOffset.UtcNow
+            };
+
+            using var scope = _logger.BeginScope(scopeProperties);
+
+            // Read the request body
+            string requestBody;
+            using (var reader = new StreamReader(Request.Body, leaveOpen: true))
+            {
+                requestBody = await reader.ReadToEndAsync();
+            }
+
+            // Check if empty or invalid
+            if (string.IsNullOrEmpty(requestBody))
+            {
+                _logger.LogWarning("Received empty notification body with correlation ID {CorrelationId}", correlationId);
+                return BadRequest("Request body cannot be empty");
+            }
+
+            _logger.LogDebug("Received payload with correlation ID {CorrelationId}: {PayloadStart}...", 
+                correlationId, requestBody.Length > 100 ? requestBody.Substring(0, 100) + "..." : requestBody);
+
+            // Deserialize the notification
+            var options = new JsonSerializerOptions 
+            { 
+                PropertyNameCaseInsensitive = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
             
-            // Return the validation token as plain text with 200 OK
-            var response = Content(validationToken, "text/plain");
-            _logger.LogInformation("=== VALIDATION RESPONSE SENT (POST) ===");
-            return response;
-        }
+            var notification = JsonSerializer.Deserialize<NotificationPayload>(requestBody, options);
+            
+            if (notification == null)
+            {
+                _logger.LogWarning("Failed to deserialize notification payload with correlation ID {CorrelationId}", correlationId);
+                return BadRequest("Invalid notification format");
+            }
 
-        // If no validationToken, proceed with normal notification processing
-        _logger.LogInformation("No validationToken found - processing as notification");
-
-        // Security validation for actual notifications
-        if (!ValidateNotificationRequest())
-        {
-            _logger.LogWarning("Graph notification request validation failed from {RemoteIpAddress}", 
-                HttpContext.Connection.RemoteIpAddress?.ToString());
-            return BadRequest("Invalid request");
-        }
-
-        // Content length validation
-        if (Request.ContentLength > MAX_REQUEST_SIZE)
-        {
-            _logger.LogWarning("Graph notification request too large: {ContentLength} bytes from {RemoteIpAddress}", 
-                Request.ContentLength, HttpContext.Connection.RemoteIpAddress?.ToString());
-            return BadRequest("Request too large");
-        }
-
-        // Add correlation ID to response headers for traceability
-        HttpContext.Response.Headers.Append(CORRELATION_ID_HEADER, correlationId);
-
-        // Enhanced logging for compliance
-        var scopeProperties = new Dictionary<string, object?>
-        {
-            ["CorrelationId"] = correlationId,
-            ["Operation"] = "GraphNotificationProcessing",
-            ["RemoteIpAddress"] = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown",
-            ["UserAgent"] = HttpContext.Request.Headers.UserAgent.ToString(),
-            ["Timestamp"] = DateTimeOffset.UtcNow
-        };
-
-        using var scope = _logger.BeginScope(scopeProperties);
-
-        // Read the request body
-        string requestBody;
-        using (var reader = new StreamReader(Request.Body, leaveOpen: true))
-        {
-            requestBody = await reader.ReadToEndAsync();
-        }
-
-        // Check if empty or invalid
-        if (string.IsNullOrEmpty(requestBody))
-        {
-            _logger.LogWarning("Received empty notification body with correlation ID {CorrelationId}", correlationId);
-            return BadRequest("Request body cannot be empty");
-        }
-
-        _logger.LogDebug("Received payload with correlation ID {CorrelationId}: {PayloadStart}...", 
-            correlationId, requestBody.Length > 100 ? requestBody.Substring(0, 100) + "..." : requestBody);
-
-        // Deserialize the notification
-        var options = new JsonSerializerOptions 
-        { 
-            PropertyNameCaseInsensitive = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-        };
-        
-        var notification = JsonSerializer.Deserialize<NotificationPayload>(requestBody, options);
-        
-        if (notification == null)
-        {
-            _logger.LogWarning("Failed to deserialize notification payload with correlation ID {CorrelationId}", correlationId);
-            return BadRequest("Invalid notification format");
-        }
+            // Handle validation requests ONLY if no notifications are present
+            if (!string.IsNullOrEmpty(notification.ValidationCode))
+            {
+                _logger.LogInformation("Handling POST validation request with validation code and correlation ID {CorrelationId}", correlationId);
+                return HandleValidationRequest(notification);
+            }
 
             // Handle actual notification
             if (notification.Value?.Count > 0)
@@ -360,6 +311,10 @@ public async Task<IActionResult> Post()
                 {
                     await HandleTranscriptNotification(change);
                 }
+                else if (change.Resource?.Contains("communications/calls") == true)
+                {
+                    await HandleCallNotification(change);
+                }
                 else
                 {
                     _logger.LogInformation("Received notification for unsupported resource: {Resource}", 
@@ -451,6 +406,221 @@ public async Task<IActionResult> Post()
                 ComplianceEventType.RecordingDeleted,
                 new MeetingInfo { Id = meetingId },
                 CancellationToken.None);
+        }
+    }
+
+    /// <summary>
+    /// Handle a call notification - this is where we automatically join calls for compliance recording
+    /// </summary>
+    private async Task HandleCallNotification(ChangeNotification change)
+    {
+        if (string.IsNullOrEmpty(change.Resource))
+        {
+            _logger.LogWarning("Received call notification with null or empty Resource");
+            return;
+        }
+
+        _logger.LogInformation("Processing call notification: Resource={Resource}, ChangeType={ChangeType}", 
+            change.Resource, change.ChangeType);
+
+        try
+        {
+            // Extract call ID from the resource URL
+            // Expected format: /communications/calls/{call-id}
+            var resourceParts = change.Resource.Split('/');
+            string? callId = null;
+
+            for (int i = 0; i < resourceParts.Length - 1; i++)
+            {
+                if (resourceParts[i] == "calls" && i + 1 < resourceParts.Length)
+                {
+                    callId = resourceParts[i + 1];
+                    break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(callId))
+            {
+                _logger.LogWarning("Could not extract call ID from notification resource: {Resource}", change.Resource);
+                return;
+            }
+
+            // Handle different call notification types
+            switch (change.ChangeType.ToLowerInvariant())
+            {
+                case "created":
+                    _logger.LogInformation("Call {CallId} was created - attempting to join for compliance recording", callId);
+                    await HandleCallCreated(callId, change);
+                    break;
+
+                case "updated":
+                    _logger.LogInformation("Call {CallId} was updated - checking if action needed", callId);
+                    await HandleCallUpdated(callId, change);
+                    break;
+
+                case "deleted":
+                    _logger.LogInformation("Call {CallId} was ended/deleted", callId);
+                    await HandleCallEnded(callId, change);
+                    break;
+
+                default:
+                    _logger.LogInformation("Received call notification with unsupported change type: {ChangeType} for call {CallId}", 
+                        change.ChangeType, callId);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing call notification: {Message}", ex.Message);
+            
+            // Log compliance event for the error
+            await _complianceService.LogComplianceEventAsync(
+                ComplianceEventType.SystemError,
+                new MeetingInfo { Id = "unknown" },
+                CancellationToken.None);
+        }
+    }
+
+    /// <summary>
+    /// Handle when a new call is created - this is where we join the call
+    /// </summary>
+    private async Task HandleCallCreated(string callId, ChangeNotification change)
+    {
+        try
+        {
+            _logger.LogInformation("Attempting to join call {CallId} for compliance recording", callId);
+
+            // Try to join the call using our call joining service
+            var joinResult = await _callJoiningService.JoinCallAsync(callId, CancellationToken.None);
+
+            if (joinResult.Success)
+            {
+                _logger.LogInformation("Successfully joined call {CallId} for compliance recording", callId);
+                
+                // Log successful compliance event
+                await _complianceService.LogComplianceEventAsync(
+                    ComplianceEventType.CallJoined,
+                    new MeetingInfo { Id = callId },
+                    CancellationToken.None);
+
+                // Track telemetry
+                _telemetryClient.TrackEvent("CallJoined", new Dictionary<string, string>
+                {
+                    ["CallId"] = callId,
+                    ["JoinMethod"] = "GraphNotification",
+                    ["Timestamp"] = DateTimeOffset.UtcNow.ToString()
+                });
+            }
+            else
+            {
+                _logger.LogWarning("Failed to join call {CallId} for compliance recording", callId);
+                
+                // Log failed compliance event
+                await _complianceService.LogComplianceEventAsync(
+                    ComplianceEventType.SystemError,
+                    new MeetingInfo { Id = callId },
+                    CancellationToken.None);
+
+                // Track failure telemetry
+                _telemetryClient.TrackEvent("CallJoinFailed", new Dictionary<string, string>
+                {
+                    ["CallId"] = callId,
+                    ["JoinMethod"] = "GraphNotification",
+                    ["Timestamp"] = DateTimeOffset.UtcNow.ToString(),
+                    ["Reason"] = "JoinCallAsync returned false"
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error joining call {CallId}: {Message}", callId, ex.Message);
+            
+            // Log compliance event for the error
+            await _complianceService.LogComplianceEventAsync(
+                ComplianceEventType.SystemError,
+                new MeetingInfo { Id = callId },
+                CancellationToken.None);
+
+            // Track exception telemetry
+            _telemetryClient.TrackException(ex, new Dictionary<string, string>
+            {
+                ["CallId"] = callId,
+                ["Operation"] = "CallJoin",
+                ["JoinMethod"] = "GraphNotification"
+            });
+        }
+    }
+
+    /// <summary>
+    /// Handle when a call is updated - check if we need to start recording
+    /// </summary>
+    private async Task HandleCallUpdated(string callId, ChangeNotification change)
+    {
+        try
+        {
+            _logger.LogInformation("Call {CallId} was updated - checking recording status", callId);
+
+            // Check if we need to start recording (e.g., if call state changed to "established")
+            // The resource data might contain information about the call state
+            if (change.ResourceData?.AdditionalData != null)
+            {
+                var callData = change.ResourceData.AdditionalData;
+                
+                // Log what we received for debugging
+                _logger.LogDebug("Call {CallId} update data: {Data}", callId, 
+                    string.Join(", ", callData.Select(kvp => $"{kvp.Key}={kvp.Value}")));
+
+                // Check if this is a call state change that indicates we should start recording
+                if (callData.ContainsKey("state") && callData["state"]?.ToString() == "established")
+                {
+                    _logger.LogInformation("Call {CallId} is now established - ensuring recording is started", callId);
+                    
+                    // Try to start recording if not already started
+                    var meetingInfo = new MeetingInfo { Id = callId };
+                    await _recordingService.StartRecordingAsync(meetingInfo, CancellationToken.None);
+                    
+                    // Log compliance event
+                    await _complianceService.LogComplianceEventAsync(
+                        ComplianceEventType.RecordingStarted,
+                        new MeetingInfo { Id = callId },
+                        CancellationToken.None);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling call update for {CallId}: {Message}", callId, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Handle when a call ends - ensure recording is stopped and processed
+    /// </summary>
+    private async Task HandleCallEnded(string callId, ChangeNotification change)
+    {
+        try
+        {
+            _logger.LogInformation("Call {CallId} has ended - ensuring recording is stopped and processed", callId);
+
+            // Stop recording if it's still active
+            await _recordingService.StopRecordingAsync(callId, CancellationToken.None);
+
+            // Log compliance event
+            await _complianceService.LogComplianceEventAsync(
+                ComplianceEventType.CallEnded,
+                new MeetingInfo { Id = callId },
+                CancellationToken.None);
+
+            // Track telemetry
+            _telemetryClient.TrackEvent("CallEnded", new Dictionary<string, string>
+            {
+                ["CallId"] = callId,
+                ["Timestamp"] = DateTimeOffset.UtcNow.ToString()
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling call end for {CallId}: {Message}", callId, ex.Message);
         }
     }
 

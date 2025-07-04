@@ -26,7 +26,8 @@ public class CallRecordingService : ICallRecordingService, IDisposable
     private readonly IMemoryCache _cache;
     private readonly IGraphSubscriptionService _subscriptionService;
     private readonly SemaphoreSlim _concurrencyLimiter;
-    private readonly ConcurrentDictionary<string, SemaphoreSlim> _recordingLocks;    private readonly Timer _healthCheckTimer;
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _recordingLocks;
+    private readonly Timer _healthCheckTimer;
     private readonly CancellationTokenSource _cancellationTokenSource;
     
     private const int MAX_CONCURRENT_RECORDINGS = 10;
@@ -38,8 +39,6 @@ public class CallRecordingService : ICallRecordingService, IDisposable
     
     private readonly ConcurrentDictionary<string, string> _activeRecordingIds = new();
     private volatile bool _disposed = false;
-    private static volatile bool _containersInitialized = false;
-    private static readonly object _initializationLock = new object();
 
     public CallRecordingService(
         GraphServiceClient graphServiceClient,
@@ -55,16 +54,15 @@ public class CallRecordingService : ICallRecordingService, IDisposable
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         _subscriptionService = subscriptionService ?? throw new ArgumentNullException(nameof(subscriptionService));
-          _concurrencyLimiter = new SemaphoreSlim(MAX_CONCURRENT_RECORDINGS, MAX_CONCURRENT_RECORDINGS);
+        
+        _concurrencyLimiter = new SemaphoreSlim(MAX_CONCURRENT_RECORDINGS, MAX_CONCURRENT_RECORDINGS);
         _recordingLocks = new ConcurrentDictionary<string, SemaphoreSlim>();
         _cancellationTokenSource = new CancellationTokenSource();
         
         // Start health check timer
-        _healthCheckTimer = new Timer(PerformHealthCheck, null, TimeSpan.Zero, TimeSpan.FromMinutes(5));        // Initialize containers only once per application lifecycle
-        if (!_containersInitialized)
-        {
-            InitializeContainersOnce();
-        }
+        _healthCheckTimer = new Timer(PerformHealthCheck, null, TimeSpan.Zero, TimeSpan.FromMinutes(5));
+        
+        _ = InitializeContainersAsync();
     }
 
     public async Task<Models.RecordingResult> StartRecordingAsync(Models.MeetingInfo meetingInfo, CancellationToken cancellationToken = default)
@@ -142,178 +140,6 @@ public class CallRecordingService : ICallRecordingService, IDisposable
         {
             _logger.LogError(ex, "Unexpected error starting recording for meeting {MeetingId}", meetingInfo.Id);
             return Models.RecordingResult.CreateFailure($"Unexpected error: {ex.Message}", "UNEXPECTED_ERROR", ex);
-        }
-    }
-
-    /// <summary>
-    /// Process a call record for compliance requirements
-    /// </summary>
-    public async Task ProcessCallRecordForComplianceAsync(Microsoft.Graph.Models.CallRecords.CallRecord callRecord, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            if (callRecord == null)
-            {
-                _logger.LogWarning("Received null call record for compliance processing");
-                return;
-            }
-
-            _logger.LogInformation("Processing call record {CallRecordId} for compliance", callRecord.Id);
-
-            // Check if this call requires compliance recording based on participants
-            var requiresCompliance = await ShouldRecordForComplianceAsync(callRecord);
-            
-            if (!requiresCompliance)
-            {
-                _logger.LogDebug("Call record {CallRecordId} does not require compliance recording", callRecord.Id);
-                return;
-            }            // Create compliance metadata
-            var complianceMetadata = new Models.RecordingMetadata
-            {
-                Id = Guid.NewGuid().ToString(),
-                MeetingId = callRecord.Id ?? string.Empty,
-                MeetingTitle = $"Compliance Call Record - {callRecord.Id}",
-                Organizer = callRecord.Organizer?.User?.DisplayName ?? "Unknown",
-                Status = Models.RecordingStatus.Processing,
-                StartTime = callRecord.StartDateTime?.DateTime ?? DateTime.UtcNow,
-                EndTime = callRecord.EndDateTime?.DateTime ?? DateTime.UtcNow,
-                Participants = ExtractParticipantsFromCallRecord(callRecord),
-                CreatedAt = DateTime.UtcNow,
-                TenantId = _configuration["MicrosoftAppTenantId"] ?? string.Empty,
-                BlobPath = $"compliance/{callRecord.Id}/metadata.json"
-            };
-
-            // Add compliance-specific metadata
-            complianceMetadata.Metadata["CallRecordId"] = callRecord.Id ?? string.Empty;
-            complianceMetadata.Metadata["ComplianceProcessing"] = "true";
-            complianceMetadata.Metadata["PolicyVersion"] = _configuration["Compliance:PolicyVersion"] ?? "1.0";
-            complianceMetadata.Metadata["ComplianceFlags"] = string.Join(",", DetermineComplianceFlags(callRecord));
-
-            // Store compliance metadata
-            await StoreRecordingMetadataAsync(complianceMetadata, cancellationToken);
-
-            // Check if actual recording exists and needs to be preserved
-            await CheckForExistingRecordingAsync(callRecord, complianceMetadata, cancellationToken);
-
-            _logger.LogInformation("Completed compliance processing for call record {CallRecordId}", callRecord.Id);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing call record {CallRecordId} for compliance", callRecord?.Id);
-        }
-    }    private Task<bool> ShouldRecordForComplianceAsync(Microsoft.Graph.Models.CallRecords.CallRecord callRecord)
-    {
-        try
-        {
-            // Check if any participants are from domains that require compliance recording
-            var adminUsers = _configuration.GetSection("Compliance:AdminUsers").Get<string[]>() ?? Array.Empty<string>();
-            var superAdminUsers = _configuration.GetSection("Compliance:SuperAdminUsers").Get<string[]>() ?? Array.Empty<string>();
-            
-            if (callRecord.Organizer?.User?.Id != null)
-            {
-                var organizerEmail = callRecord.Organizer.User.Id;
-                
-                // Check if organizer is in compliance-required domains
-                foreach (var adminPattern in adminUsers.Concat(superAdminUsers))
-                {
-                    if (organizerEmail.Contains(adminPattern.Replace("@", "")))
-                    {
-                        _logger.LogInformation("Call requires compliance recording - organizer {Organizer} matches pattern {Pattern}", 
-                            organizerEmail, adminPattern);
-                        return Task.FromResult(true);
-                    }
-                }
-            }
-
-            // Additional compliance checks can be added here
-            return Task.FromResult(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error determining compliance requirements for call record {CallRecordId}", callRecord.Id);
-            // Default to requiring compliance on error for safety
-            return Task.FromResult(true);
-        }
-    }private List<Models.ParticipantInfo> ExtractParticipantsFromCallRecord(Microsoft.Graph.Models.CallRecords.CallRecord callRecord)
-    {
-        var participants = new List<Models.ParticipantInfo>();
-        
-        try
-        {
-            if (callRecord.Organizer?.User != null)
-            {
-                participants.Add(new Models.ParticipantInfo
-                {
-                    Id = callRecord.Organizer.User.Id ?? Guid.NewGuid().ToString(),
-                    DisplayName = callRecord.Organizer.User.DisplayName ?? "Unknown Organizer",
-                    Email = callRecord.Organizer.User.Id, // In call records, the ID might be an email
-                    Role = "Organizer",
-                    JoinedAt = callRecord.StartDateTime?.DateTime ?? DateTime.UtcNow,
-                    LeftAt = callRecord.EndDateTime?.DateTime,
-                    IsRecordingConsented = true // Assume consent for compliance processing
-                });
-            }
-
-            // Note: Full participant list would require additional Graph API calls to get session details
-            // This is a simplified version for the polling service
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error extracting participants from call record {CallRecordId}", callRecord.Id);
-        }
-
-        return participants;
-    }
-
-    private List<string> DetermineComplianceFlags(Microsoft.Graph.Models.CallRecords.CallRecord callRecord)
-    {
-        var flags = new List<string>();
-        
-        try
-        {
-            if (callRecord.Type == Microsoft.Graph.Models.CallRecords.CallType.GroupCall)
-            {
-                flags.Add("GROUP_CALL");
-            }
-            
-            if (callRecord.EndDateTime.HasValue && callRecord.StartDateTime.HasValue)
-            {
-                var duration = callRecord.EndDateTime.Value - callRecord.StartDateTime.Value;
-                if (duration.TotalMinutes > 30)
-                {
-                    flags.Add("LONG_DURATION");
-                }
-            }
-
-            // Add more compliance flags as needed
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error determining compliance flags for call record {CallRecordId}", callRecord.Id);
-        }
-
-        return flags;
-    }    private Task CheckForExistingRecordingAsync(Microsoft.Graph.Models.CallRecords.CallRecord callRecord, 
-        Models.RecordingMetadata complianceMetadata, CancellationToken cancellationToken)
-    {
-        try
-        {
-            // Check if there are any existing recordings for this call
-            // This would typically involve checking OneDrive, SharePoint, or other storage locations
-            // For now, we'll just log the intent
-            _logger.LogInformation("Checking for existing recordings for call {CallRecordId}", callRecord.Id);
-            
-            // In a full implementation, this would:
-            // 1. Search for recordings in various locations
-            // 2. Download and store them in our compliance storage
-            // 3. Update the compliance metadata with recording locations
-            
-            return Task.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error checking for existing recordings for call record {CallRecordId}", callRecord.Id);
-            return Task.CompletedTask;
         }
     }
 
@@ -463,11 +289,10 @@ public class CallRecordingService : ICallRecordingService, IDisposable
     public async Task<Models.RecordingMetadata?> GetRecordingMetadataAsync(string recordingId, CancellationToken cancellationToken = default)
     {
         if (_disposed)
-            throw new ObjectDisposedException(nameof(CallRecordingService));        try
+            throw new ObjectDisposedException(nameof(CallRecordingService));
+
+        try
         {
-            // Ensure containers are initialized before accessing storage
-            await EnsureContainersInitializedAsync();
-            
             // Try cache first
             var cacheKey = $"recording_metadata_{recordingId}";
             if (_cache.TryGetValue(cacheKey, out Models.RecordingMetadata? cachedMetadata))
@@ -655,6 +480,59 @@ public class CallRecordingService : ICallRecordingService, IDisposable
         }
     }
 
+    public async Task<bool> ProcessCallRecordForComplianceAsync(string callRecordId, CancellationToken cancellationToken = default)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(CallRecordingService));
+
+        try
+        {
+            _logger.LogInformation("Processing call record {CallRecordId} for compliance", callRecordId);
+            
+            // Fetch call record from Graph API
+            var callRecord = await _graphServiceClient.Communications.CallRecords[callRecordId]
+                .GetAsync(cancellationToken: cancellationToken);
+                
+            if (callRecord == null)
+            {
+                _logger.LogWarning("Call record {CallRecordId} not found", callRecordId);
+                return false;
+            }
+
+            // Create compliance metadata
+            var complianceData = new
+            {
+                CallRecordId = callRecord.Id,
+                StartTime = callRecord.StartDateTime,
+                EndTime = callRecord.EndDateTime,
+                Participants = callRecord.Participants?.Count ?? 0,
+                Organizer = callRecord.Organizer?.User?.DisplayName,
+                ProcessedAt = DateTime.UtcNow
+            };
+
+            // Store compliance metadata in blob storage
+            var containerClient = _blobServiceClient.GetBlobContainerClient(METADATA_CONTAINER_NAME);
+            var blobName = $"compliance/{callRecordId}-{DateTime.UtcNow:yyyyMMdd}.json";
+            var blobClient = containerClient.GetBlobClient(blobName);
+            
+            var jsonData = JsonSerializer.Serialize(complianceData, new JsonSerializerOptions { WriteIndented = true });
+            await blobClient.UploadAsync(new BinaryData(jsonData), overwrite: true, cancellationToken);
+            
+            _logger.LogInformation("Call record {CallRecordId} processed for compliance successfully", callRecordId);
+            return true;
+        }
+        catch (ServiceException ex)
+        {
+            _logger.LogError(ex, "Graph API error processing call record {CallRecordId} for compliance", callRecordId);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing call record {CallRecordId} for compliance", callRecordId);
+            return false;
+        }
+    }
+
     #region Private Helper Methods
 
     private async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, int maxRetries, CancellationToken cancellationToken)
@@ -752,14 +630,34 @@ public class CallRecordingService : ICallRecordingService, IDisposable
             {
                 _logger.LogError("Cannot store metadata with null or empty recording ID");
                 throw new ArgumentException("Recording ID cannot be null or empty", nameof(metadata.Id));
-            }            // Ensure containers are initialized before accessing storage
-            await EnsureContainersInitializedAsync();
-            
+            }
+
             // Generate file hash for integrity
             var metadataJson = JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true });
             metadata.FileHash = ComputeHash(metadataJson);
             
             var containerClient = _blobServiceClient.GetBlobContainerClient(METADATA_CONTAINER_NAME);
+              // Retry container creation with better error handling
+            try
+            {
+                await containerClient.CreateIfNotExistsAsync(PublicAccessType.None, cancellationToken: cancellationToken);
+            }
+            catch (Azure.RequestFailedException storageEx) when (storageEx.Status == 409)
+            {
+                // Container already exists - this is expected and not an error
+                _logger.LogDebug("Metadata container already exists (409 Conflict): {ContainerName}", METADATA_CONTAINER_NAME);
+            }
+            catch (Azure.RequestFailedException storageEx) when (storageEx.Status == 403)
+            {
+                _logger.LogError(storageEx, "Permission denied creating metadata container. Verify storage account access permissions.");
+                throw new UnauthorizedAccessException($"Permission denied accessing blob storage: {storageEx.Message}", storageEx);
+            }
+            catch (Azure.RequestFailedException storageEx)
+            {
+                _logger.LogError(storageEx, "Failed to create metadata container. Status: {StatusCode}, Error: {ErrorCode}", 
+                    storageEx.Status, storageEx.ErrorCode);
+                throw;
+            }
 
             var blobName = GetMetadataBlobName(metadata.Id);
             var blobClient = containerClient.GetBlobClient(blobName);
@@ -818,61 +716,10 @@ public class CallRecordingService : ICallRecordingService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error storing recording metadata for {RecordingId}", metadata.Id);            throw;
+            _logger.LogError(ex, "Error storing recording metadata for {RecordingId}", metadata.Id);
+            throw;
         }
-    }
-
-    private void InitializeContainersOnce()
-    {
-        if (_containersInitialized)
-            return;
-
-        lock (_initializationLock)
-        {
-            if (_containersInitialized)
-                return;
-
-            try
-            {
-                _logger.LogInformation("Initializing blob storage containers (one-time setup)...");
-                
-                // Use Task.Run to avoid blocking the constructor
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await InitializeContainersAsync();
-                        _containersInitialized = true;
-                        _logger.LogInformation("✅ Blob storage containers initialized successfully");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "❌ Failed to initialize blob storage containers. Will retry on next operation.");
-                        // Don't mark as initialized so it can retry later
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error starting container initialization task");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Ensure containers are initialized before performing operations
-    /// </summary>
-    private async Task EnsureContainersInitializedAsync()
-    {
-        if (!_containersInitialized)
-        {
-            _logger.LogInformation("Containers not yet initialized, initializing now...");
-            await InitializeContainersAsync();
-            _containersInitialized = true;
-        }
-    }
-
-    private async Task InitializeContainersAsync()
+    }    private async Task InitializeContainersAsync()
     {
         try
         {            // Initialize recordings container

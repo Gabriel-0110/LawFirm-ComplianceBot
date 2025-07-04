@@ -38,7 +38,7 @@ public interface ICallRecordingService
     Task<bool> DeleteRecordingAsync(string recordingId, string reason, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Process a call record for compliance requirements
+    /// Process a call record for compliance tracking
     /// </summary>
-    Task ProcessCallRecordForComplianceAsync(Microsoft.Graph.Models.CallRecords.CallRecord callRecord, CancellationToken cancellationToken = default);
+    Task<bool> ProcessCallRecordForComplianceAsync(string callRecordId, CancellationToken cancellationToken = default);
 }
