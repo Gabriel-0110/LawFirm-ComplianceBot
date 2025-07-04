@@ -1,0 +1,78 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Microsoft.Bot": "Information",
+      "TeamsComplianceBot": "Debug"
+    },
+    "ApplicationInsights": {
+      "LogLevel": {
+        "Default": "Information"
+      }
+    }
+  },
+  "AllowedHosts": "*",
+  "MicrosoftAppId": "YOUR_LOCAL_DEV_BOT_APP_ID",
+  "MicrosoftAppPassword": "YOUR_LOCAL_DEV_BOT_APP_PASSWORD",
+  "MicrosoftAppTenantId": "YOUR_LOCAL_DEV_TENANT_ID",
+  "MicrosoftAppType": "MultiTenant",
+  "AzureAd": {
+    "Instance": "https://login.microsoftonline.com/",
+    "TenantId": "YOUR_LOCAL_DEV_TENANT_ID",
+    "ClientId": "YOUR_LOCAL_DEV_CLIENT_ID",
+    "ClientSecret": "YOUR_LOCAL_DEV_CLIENT_SECRET"
+  },
+  "ConnectionStrings": {
+    "BlobStorage": "YOUR_LOCAL_DEV_STORAGE_CONNECTION_STRING",
+    "ApplicationInsights": "YOUR_LOCAL_DEV_APPLICATION_INSIGHTS_CONNECTION_STRING"
+  },
+  "Azure": {
+    "StorageAccount": "YOUR_LOCAL_DEV_STORAGE_ACCOUNT"
+  },
+  "Compliance": {
+    "DefaultRetentionDays": 30,
+    "AutoDelete": false,
+    "PolicyVersion": "1.0-dev",
+    "AdminUsers": [
+      "@yourcompany.com",
+      "admin@yourcompany.com"
+    ],
+    "SuperAdminUsers": [
+      "superadmin@yourcompany.com"
+    ],
+    "ViewerUsers": [
+      "viewer1@yourcompany.com",
+      "viewer2@yourcompany.com"
+    ]
+  },
+  "Notifications": {
+    "RecordingStarted": true,
+    "RecordingCompleted": true,
+    "ComplianceAlerts": true,
+    "AdminRecordingAlerts": true
+  },
+  "Recording": {
+    "AutoStartRecording": true,
+    "NotifyParticipants": true,
+    "NotificationUrl": "https://YOUR_LOCAL_DEV_DOMAIN.ngrok.io/api/notifications",
+    "NotificationClientState": "YOUR_LOCAL_DEV_SECURE_TOKEN",
+    "SubscriptionRenewalMinutes": 60,
+    "PollingIntervalSeconds": 15,
+    "MaxPollingAttempts": 20,
+    "IncludeVideo": true,
+    "IncludeAudio": true,
+    "GenerateTranscription": true,
+    "VideoQuality": "HD",
+    "AudioQuality": "High",
+    "MaxRecordingLengthMinutes": 480,
+    "EncryptionCertificateThumbprint": "YOUR_LOCAL_DEV_ENCRYPTION_CERTIFICATE_THUMBPRINT"
+  },
+  "Storage": {
+    "MaxSizeBytes": 1000000000000,
+    "ConnectionString": "YOUR_LOCAL_DEV_STORAGE_CONNECTION_STRING"
+  },
+  "ApplicationInsights": {
+    "ConnectionString": "YOUR_LOCAL_DEV_APPLICATION_INSIGHTS_CONNECTION_STRING"
+  }
+}

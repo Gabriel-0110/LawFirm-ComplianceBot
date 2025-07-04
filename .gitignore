@@ -52,3 +52,45 @@ node_modules/
 # Temporary files
 *.tmp
 *.temp
+
+# Sensitive configuration files - NEVER COMMIT THESE
+**/appsettings.Development.json
+**/appsettings.Production.json
+**/appsettings.Staging.json
+DEPLOYMENT-SUCCESS.md
+deployment-logs.txt
+
+# Environment variables and secrets
+.env
+.env.local
+.env.production
+**/secrets.json
+
+# Azure deployment artifacts with potential secrets
+publish/
+deploy/
+*.zip
+app-logs*/
+latest-*/
+current-logs/
+
+# Visual Studio deployment profiles and service dependencies
+**/Properties/ServiceDependencies/
+**/Properties/serviceDependencies.*Deploy.json
+deploy-settings.json
+
+# Certificate files that may have been added accidentally
+*.pfx
+*.p12
+*.key
+*.pem
+*.cer
+
+# Archive files that may contain secrets
+TeamsComplianceBot-*.zip
+*.rar
+*.7z
+
+# Temporary files
+*.tmp
+*.temp
