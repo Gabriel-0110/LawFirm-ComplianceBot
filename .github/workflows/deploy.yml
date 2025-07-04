@@ -43,11 +43,13 @@ jobs:
         package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
     
     - name: Configure App Settings
+      shell: bash
       run: |
-        az webapp config appsettings set --name "${{ env.AZURE_WEBAPP_NAME }}" --resource-group "Arandia-Apps" --settings @"deploy-settings.json"
+        az webapp config appsettings set --name "${{ env.AZURE_WEBAPP_NAME }}" --resource-group "Arandia-Apps" --settings @deploy-settings.json
       continue-on-error: true
     
     - name: Restart Web App
+      shell: bash
       run: |
         az webapp restart --name "${{ env.AZURE_WEBAPP_NAME }}" --resource-group "Arandia-Apps"
     
