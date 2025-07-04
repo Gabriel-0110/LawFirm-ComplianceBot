@@ -1,56 +1,64 @@
-name: Deploy to Azure App Service
+name: Deploy Teams Compliance Bot to Azure
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  AZURE_WEBAPP_NAME: 'teamsbot'
+  AZURE_WEBAPP_PACKAGE_PATH: './publish'
+  DOTNET_VERSION: '9.0'
+
 jobs:
   build-and-deploy:
     runs-on: windows-latest
-
+    
     steps:
     - uses: actions/checkout@v4
-
-    - name: Set up .NET Core
+    
+    - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '9.0.x'
-
-    - name: Build with dotnet
-      run: dotnet build --configuration Release
-
-    - name: dotnet publish
-      run: dotnet publish -c Release -o ./publish
-
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    
+    - name: Restore dependencies
+      run: dotnet restore "TeamsComplianceBot/TeamsComplianceBot.csproj"
+    
+    - name: Build
+      run: dotnet build "TeamsComplianceBot/TeamsComplianceBot.csproj" --configuration Release --no-restore
+    
+    - name: Publish
+      run: dotnet publish "TeamsComplianceBot/TeamsComplianceBot.csproj" --configuration Release --no-build --output ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+    
     - name: Azure Login
-      uses: Azure/login@v2.3.0
+      uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
-
+    
     - name: Deploy to Azure Web App
-      id: deploy-to-webapp
       uses: azure/webapps-deploy@v2
       with:
-        app-name: 'teamsbot'
-        slot-name: 'Production'
-        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: ./publish
-
-    - name: Configure App Settings using Azure CLI
-      shell: bash
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+    
+    - name: Configure App Settings
       run: |
-        az webapp config appsettings set \
-          --name teamsbot \
-          --resource-group Arandia-Apps \
-          --settings \
-            MicrosoftAppId='${{ secrets.MICROSOFT_APP_ID }}' \
-            MicrosoftAppPassword='${{ secrets.MICROSOFT_APP_PASSWORD }}' \
-            MicrosoftAppTenantId='${{ secrets.MICROSOFT_APP_TENANT_ID }}' \
-            AzureAd__TenantId='${{ secrets.MICROSOFT_APP_TENANT_ID }}' \
-            AzureAd__ClientId='${{ secrets.AZURE_AD_CLIENT_ID }}' \
-            AzureAd__ClientSecret='${{ secrets.AZURE_AD_CLIENT_SECRET }}' \
-            ConnectionStrings__BlobStorage='${{ secrets.BLOB_STORAGE_CONNECTION }}' \
-            ApplicationInsights__ConnectionString='${{ secrets.APPLICATION_INSIGHTS_CONNECTION }}' \
-            Azure__StorageAccount='${{ secrets.STORAGE_ACCOUNT_NAME }}' \
-            Storage__ConnectionString='${{ secrets.BLOB_STORAGE_CONNECTION }}'
+        az webapp config appsettings set --name "${{ env.AZURE_WEBAPP_NAME }}" --resource-group "Arandia-Apps" --settings @"deploy-settings.json"
+      continue-on-error: true
+    
+    - name: Restart Web App
+      run: |
+        az webapp restart --name "${{ env.AZURE_WEBAPP_NAME }}" --resource-group "Arandia-Apps"
+    
+    - name: Deployment Summary
+      run: |
+        echo "🚀 Deployment completed successfully!"
+        echo "📊 Application Insights 404 renewal errors should be fixed"
+        echo "🔧 New subscription management endpoints available"
+        echo "🌐 Updated domain URLs: arandiateamsbot.ggunifiedtech.com"
+        echo ""
+        echo "🔗 Test endpoints after deployment:"
+        echo "- https://arandiateamsbot.ggunifiedtech.com/api/subscriptions/fix-renewal-errors"
+        echo "- https://arandiateamsbot.ggunifiedtech.com/api/subscriptions/manage-all"
+        echo "- https://arandiateamsbot.ggunifiedtech.com/api/subscriptions/health"

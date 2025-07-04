@@ -1,0 +1,52 @@
+[
+  {
+    "name": "MicrosoftAppId",
+    "value": "153ad72f-6fa4-4e88-b0fe-f0f785466699",
+    "slotSetting": false
+  },
+  {
+    "name": "MicrosoftAppPassword",
+    "value": "[PLACEHOLDER_MICROSOFT_APP_PASSWORD]",
+    "slotSetting": false
+  },
+  {
+    "name": "MicrosoftAppTenantId", 
+    "value": "59020e57-1a7b-463f-abbe-eed76e79d47c",
+    "slotSetting": false
+  },
+  {
+    "name": "AzureAd__TenantId",
+    "value": "59020e57-1a7b-463f-abbe-eed76e79d47c",
+    "slotSetting": false
+  },
+  {
+    "name": "AzureAd__ClientId",
+    "value": "153ad72f-6fa4-4e88-b0fe-f0f785466699",
+    "slotSetting": false
+  },
+  {
+    "name": "AzureAd__ClientSecret",
+    "value": "[PLACEHOLDER_AZURE_AD_CLIENT_SECRET]",
+    "slotSetting": false
+  },
+  {
+    "name": "ConnectionStrings__BlobStorage",
+    "value": "[PLACEHOLDER_BLOB_STORAGE_CONNECTION]",
+    "slotSetting": false
+  },
+  {
+    "name": "ApplicationInsights__ConnectionString",
+    "value": "[PLACEHOLDER_APPLICATION_INSIGHTS_CONNECTION]",
+    "slotSetting": false
+  },
+  {
+    "name": "Azure__StorageAccount",
+    "value": "arandiabotstorage",
+    "slotSetting": false
+  },
+  {
+    "name": "Storage__ConnectionString",
+    "value": "[PLACEHOLDER_STORAGE_CONNECTION_STRING]",
+    "slotSetting": false
+  }
+]
