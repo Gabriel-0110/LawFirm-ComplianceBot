@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using TeamsComplianceBot.Services;
 using System.Text.Json;
+using Microsoft.Graph;
 
 namespace TeamsComplianceBot.Controllers
 {
@@ -24,6 +25,7 @@ namespace TeamsComplianceBot.Controllers
         private readonly ICallRecordingService _callRecordingService;
         private readonly IComplianceService _complianceService;
         private readonly IBot _bot;
+        private readonly GraphServiceClient _graphServiceClient;
 
         // Security and monitoring
         private static readonly ActivitySource ActivitySource = new("TeamsComplianceBot.CallsController");
@@ -36,13 +38,15 @@ namespace TeamsComplianceBot.Controllers
             TelemetryClient telemetryClient,
             ICallRecordingService callRecordingService,
             IComplianceService complianceService,
-            IBot bot)
+            IBot bot,
+            GraphServiceClient graphServiceClient)
         {            _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _telemetryClient = telemetryClient ?? throw new ArgumentNullException(nameof(telemetryClient));
             _callRecordingService = callRecordingService ?? throw new ArgumentNullException(nameof(callRecordingService));
             _complianceService = complianceService ?? throw new ArgumentNullException(nameof(complianceService));
             _bot = bot ?? throw new ArgumentNullException(nameof(bot));
+            _graphServiceClient = graphServiceClient ?? throw new ArgumentNullException(nameof(graphServiceClient));
         }
 
         /// <summary>
@@ -833,79 +837,72 @@ namespace TeamsComplianceBot.Controllers
             {
                 _logger.LogInformation("Updating recording status to '{Status}' for call {CallId} (correlation: {CorrelationId})", status, callId, correlationId);
 
-                // TODO: Implement actual Microsoft Graph API call to updateRecordingStatus
-                // IMPLEMENTATION REQUIRED:
-                // 
-                // 1. Add Microsoft Graph SDK NuGet package:
-                //    Microsoft.Graph
-                //    Microsoft.Graph.Auth
-                //
-                // 2. Configure Graph client with appropriate authentication:
-                //    - Use managed identity or service principal
-                //    - Ensure proper scopes: Calls.AccessMedia.All, Calls.Initiate.All
-                //
-                // 3. Make the actual API call:
-                //    PATCH /communications/calls/{call-id}/updateRecordingStatus
-                //    Headers: Authorization: Bearer {token}
-                //    Body: { "status": "recording" | "notRecording" }
-                //
-                // 4. Example implementation:
-                //    var graphServiceClient = GetGraphServiceClient();
-                //    var updateRecordingStatusRequest = new UpdateRecordingStatusRequest
-                //    {
-                //        Status = status // "recording" or "notRecording"
-                //    };
-                //    var response = await graphServiceClient.Communications.Calls[callId]
-                //        .UpdateRecordingStatus(updateRecordingStatusRequest)
-                //        .Request()
-                //        .PostAsync();
-                //
-                // 5. Handle Graph API responses:
-                //    - Success: 200 OK with operation ID
-                //    - Failure: 4xx/5xx with error details
-                //    - Implement retry logic for transient failures
-                //
-                // 6. Security considerations:
-                //    - Store credentials in Azure Key Vault
-                //    - Use managed identity where possible
-                //    - Implement proper token caching and refresh
-                //
-                // COMPLIANCE NOTES:
-                // - This API call is MANDATORY before recording per Microsoft documentation
-                // - Failure to call this API violates Microsoft Graph Media Access API terms
-                // - Must receive success response before proceeding with actual recording
+                // ✅ IMPLEMENTED: Actual Microsoft Graph API call to updateRecordingStatus
+                // This is MANDATORY per Microsoft Graph Media Access API documentation
                 
-                // For now, simulate the API call
-                await Task.Delay(100); // Simulate API call delay
+                var updateRecordingStatusPostRequestBody = new Microsoft.Graph.Communications.Calls.Item.UpdateRecordingStatus.UpdateRecordingStatusPostRequestBody
+                {
+                    Status = status == "recording" ? 
+                        Microsoft.Graph.Models.RecordingStatus.Recording : 
+                        Microsoft.Graph.Models.RecordingStatus.NotRecording
+                };
 
-                // Log the compliance action
-                _telemetryClient.TrackEvent("GraphAPI.UpdateRecordingStatus", new Dictionary<string, string>
+                _logger.LogInformation("Calling Microsoft Graph updateRecordingStatus API for call {CallId}", callId);
+
+                // Make the actual Graph API call
+                await _graphServiceClient.Communications.Calls[callId].UpdateRecordingStatus
+                    .PostAsync(updateRecordingStatusPostRequestBody);
+
+                _logger.LogInformation("✅ Successfully updated recording status to '{Status}' for call {CallId} via Microsoft Graph API", status, callId);
+
+                // Log the compliance action with success
+                _telemetryClient.TrackEvent("GraphAPI.UpdateRecordingStatus.Success", new Dictionary<string, string>
                 {
                     ["CallId"] = callId,
                     ["Status"] = status,
                     ["CorrelationId"] = correlationId,
                     ["Timestamp"] = DateTimeOffset.UtcNow.ToString(),
-                    ["Implementation"] = "SIMULATED - REQUIRES_GRAPH_SDK"
+                    ["Implementation"] = "MICROSOFT_GRAPH_API",
+                    ["Result"] = "SUCCESS"
+                });
+                
+                return (true, $"Recording status successfully updated to {status} via Microsoft Graph API");
+            }
+            catch (Microsoft.Graph.Models.ODataErrors.ODataError odataEx)
+            {
+                // Handle specific Graph API errors
+                var errorCode = odataEx.Error?.Code ?? "UnknownGraphError";
+                var errorMessage = odataEx.Error?.Message ?? "Unknown Graph API error";
+                
+                _logger.LogError("❌ Microsoft Graph API error updating recording status for call {CallId}: {ErrorCode} - {ErrorMessage}", 
+                    callId, errorCode, errorMessage);
+                
+                _telemetryClient.TrackEvent("GraphAPI.UpdateRecordingStatus.GraphError", new Dictionary<string, string>
+                {
+                    ["CallId"] = callId,
+                    ["Status"] = status,
+                    ["CorrelationId"] = correlationId,
+                    ["ErrorCode"] = errorCode,
+                    ["ErrorMessage"] = errorMessage,
+                    ["Implementation"] = "MICROSOFT_GRAPH_API"
                 });
 
-                _logger.LogWarning("⚠️  Recording status update simulated for call {CallId} with status '{Status}' - IMPLEMENT ACTUAL GRAPH API CALL", callId, status);
-                
-                // TODO: Replace this simulation with actual Graph API implementation
-                return (true, $"Recording status updated to {status} (SIMULATED)");
+                return (false, $"Graph API error: {errorCode} - {errorMessage}");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to update recording status for call {CallId} to '{Status}'", callId, status);
+                _logger.LogError(ex, "❌ Failed to update recording status for call {CallId} to '{Status}'", callId, status);
                 
                 _telemetryClient.TrackException(ex, new Dictionary<string, string>
                 {
-                    ["Operation"] = "UpdateRecordingStatus",
                     ["CallId"] = callId,
                     ["Status"] = status,
-                    ["CorrelationId"] = correlationId
+                    ["CorrelationId"] = correlationId,
+                    ["Operation"] = "UpdateRecordingStatus",
+                    ["Implementation"] = "MICROSOFT_GRAPH_API"
                 });
 
-                return (false, $"Failed to update recording status: {ex.Message}");
+                return (false, $"Exception: {ex.Message}");
             }
         }
 
