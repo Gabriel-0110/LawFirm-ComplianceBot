@@ -839,31 +839,38 @@ namespace TeamsComplianceBot.Controllers
 
                 // ✅ IMPLEMENTED: Actual Microsoft Graph API call to updateRecordingStatus
                 // This is MANDATORY per Microsoft Graph Media Access API documentation
+                // Including ClientContext for session tracking and compliance requirements
                 
                 var updateRecordingStatusPostRequestBody = new Microsoft.Graph.Communications.Calls.Item.UpdateRecordingStatus.UpdateRecordingStatusPostRequestBody
                 {
                     Status = status == "recording" ? 
                         Microsoft.Graph.Models.RecordingStatus.Recording : 
-                        Microsoft.Graph.Models.RecordingStatus.NotRecording
+                        Microsoft.Graph.Models.RecordingStatus.NotRecording,
+                    
+                    // 🔥 COMPLIANCE ENHANCEMENT: Add ClientContext for session tracking
+                    // This provides session context for compliance recording requirements
+                    ClientContext = $"Teams-Compliance-Bot-Session-{correlationId}-{DateTimeOffset.UtcNow:yyyyMMddHHmmss}"
                 };
 
-                _logger.LogInformation("Calling Microsoft Graph updateRecordingStatus API for call {CallId}", callId);
+                _logger.LogInformation("Calling Microsoft Graph updateRecordingStatus API for call {CallId} with ClientContext for session tracking", callId);
 
                 // Make the actual Graph API call
                 await _graphServiceClient.Communications.Calls[callId].UpdateRecordingStatus
                     .PostAsync(updateRecordingStatusPostRequestBody);
 
-                _logger.LogInformation("✅ Successfully updated recording status to '{Status}' for call {CallId} via Microsoft Graph API", status, callId);
+                _logger.LogInformation("✅ Successfully updated recording status to '{Status}' for call {CallId} via Microsoft Graph API with session context", status, callId);
 
-                // Log the compliance action with success
+                // Log the compliance action with success including session context
                 _telemetryClient.TrackEvent("GraphAPI.UpdateRecordingStatus.Success", new Dictionary<string, string>
                 {
                     ["CallId"] = callId,
                     ["Status"] = status,
                     ["CorrelationId"] = correlationId,
+                    ["ClientContext"] = updateRecordingStatusPostRequestBody.ClientContext ?? "Unknown",
                     ["Timestamp"] = DateTimeOffset.UtcNow.ToString(),
                     ["Implementation"] = "MICROSOFT_GRAPH_API",
-                    ["Result"] = "SUCCESS"
+                    ["Result"] = "SUCCESS",
+                    ["SessionCompliance"] = "ENABLED"
                 });
                 
                 return (true, $"Recording status successfully updated to {status} via Microsoft Graph API");
@@ -884,7 +891,8 @@ namespace TeamsComplianceBot.Controllers
                     ["CorrelationId"] = correlationId,
                     ["ErrorCode"] = errorCode,
                     ["ErrorMessage"] = errorMessage,
-                    ["Implementation"] = "MICROSOFT_GRAPH_API"
+                    ["Implementation"] = "MICROSOFT_GRAPH_API",
+                    ["SessionCompliance"] = "ERROR"
                 });
 
                 return (false, $"Graph API error: {errorCode} - {errorMessage}");
@@ -899,7 +907,8 @@ namespace TeamsComplianceBot.Controllers
                     ["Status"] = status,
                     ["CorrelationId"] = correlationId,
                     ["Operation"] = "UpdateRecordingStatus",
-                    ["Implementation"] = "MICROSOFT_GRAPH_API"
+                    ["Implementation"] = "MICROSOFT_GRAPH_API",
+                    ["SessionCompliance"] = "ERROR"
                 });
 
                 return (false, $"Exception: {ex.Message}");
