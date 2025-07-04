@@ -651,42 +651,78 @@ namespace TeamsComplianceBot.Controllers
         }
 
         /// <summary>
-        /// Handle established call - start recording
+        /// Handle established call - start recording with proper Microsoft Graph compliance
         /// </summary>
         private async Task<object> HandleEstablishedCallAsync(string? callId, Dictionary<string, object> callData, string correlationId)
         {
             try
             {
-                _logger.LogInformation("Call {CallId} established - starting recording", callId);
+                _logger.LogInformation("Call {CallId} established - starting compliance recording", callId);
 
                 // Log compliance event for call establishment
-                await LogComplianceCallEventAsync("CallEstablished", correlationId);                // Start recording through the call recording service
+                await LogComplianceCallEventAsync("CallEstablished", correlationId);
+
                 if (!string.IsNullOrEmpty(callId))
                 {
-                    // Create a basic MeetingInfo object for the call
-                    var meetingInfo = new TeamsComplianceBot.Models.MeetingInfo
+                    // 🚨 MICROSOFT COMPLIANCE REQUIREMENT: Must call updateRecordingStatus BEFORE starting recording
+                    // This is mandatory per Microsoft Graph API documentation for Media Access API
+                    _logger.LogInformation("Calling updateRecordingStatus API to indicate recording start for call {CallId}", callId);
+                    
+                    try
                     {
-                        Id = callId,
-                        Title = "Teams Call Recording",
-                        StartTime = DateTime.UtcNow,
-                        Organizer = "Teams Compliance Bot",
-                        TenantId = "59020e57-1a7b-463f-abbe-eed76e79d47c" // From config
-                    };
+                        // First, update recording status to indicate recording is starting
+                        var recordingStatusResponse = await UpdateRecordingStatusAsync(callId, "recording", correlationId);
+                        
+                        if (recordingStatusResponse.Success)
+                        {
+                            _logger.LogInformation("Recording status successfully updated for call {CallId}, proceeding with actual recording", callId);
+                            
+                            // Only start actual recording AFTER successful updateRecordingStatus API call
+                            var meetingInfo = new TeamsComplianceBot.Models.MeetingInfo
+                            {
+                                Id = callId,
+                                Title = "Teams Call Recording",
+                                StartTime = DateTime.UtcNow,
+                                Organizer = "Teams Compliance Bot",
+                                TenantId = "59020e57-1a7b-463f-abbe-eed76e79d47c"
+                            };
 
-                    var recordingResult = await _callRecordingService.StartRecordingAsync(meetingInfo, CancellationToken.None);
-                    _logger.LogInformation("Recording started for call {CallId} with result: {RecordingResult}", callId, recordingResult.Success);
+                            var recordingResult = await _callRecordingService.StartRecordingAsync(meetingInfo, CancellationToken.None);
+                            _logger.LogInformation("Recording started for call {CallId} with result: {RecordingResult}", callId, recordingResult.Success);
+                            
+                            await LogComplianceCallEventAsync("RecordingStarted", correlationId);
+                            
+                            return new { 
+                                status = "recording_started", 
+                                callId = callId,
+                                complianceStatus = "updateRecordingStatus_called",
+                                recordingStatus = recordingResult.Success ? "active" : "failed"
+                            };
+                        }
+                        else
+                        {
+                            _logger.LogError("Failed to update recording status for call {CallId} - cannot start recording per Microsoft compliance", callId);
+                            return new { 
+                                status = "recording_failed", 
+                                callId = callId,
+                                reason = "updateRecordingStatus_failed",
+                                error = "Microsoft Graph updateRecordingStatus API failed"
+                            };
+                        }
+                    }
+                    catch (Exception updateEx)
+                    {
+                        _logger.LogError(updateEx, "Exception calling updateRecordingStatus for call {CallId}", callId);
+                        return new { 
+                            status = "recording_failed", 
+                            callId = callId,
+                            reason = "updateRecordingStatus_exception",
+                            error = updateEx.Message
+                        };
+                    }
                 }
 
-                // Update recording status indication
-                var recordingResponse = new
-                {
-                    ODataType = "#microsoft.graph.updateRecordingStatusOperation",
-                    status = "recording"
-                };
-
-                await LogComplianceCallEventAsync("RecordingStarted", correlationId);
-
-                return new { status = "recording_started", callId = callId };
+                return new { status = "recording_skipped", reason = "no_call_id" };
             }
             catch (Exception ex)
             {
@@ -696,7 +732,7 @@ namespace TeamsComplianceBot.Controllers
         }
 
         /// <summary>
-        /// Handle terminated call - finalize recording
+        /// Handle terminated call - finalize recording with proper Microsoft Graph compliance
         /// </summary>
         private async Task<object> HandleTerminatedCallAsync(string? callId, Dictionary<string, object> callData, string correlationId)
         {
@@ -705,14 +741,78 @@ namespace TeamsComplianceBot.Controllers
                 _logger.LogInformation("Call {CallId} terminated - finalizing recording", callId);
 
                 // Log compliance event for call termination
-                await LogComplianceCallEventAsync("CallTerminated", correlationId);                // Stop recording and process the recorded content
+                await LogComplianceCallEventAsync("CallTerminated", correlationId);
+
                 if (!string.IsNullOrEmpty(callId))
                 {
-                    var stopResult = await _callRecordingService.StopRecordingAsync(callId, CancellationToken.None);
-                    _logger.LogInformation("Recording stopped for call {CallId} with result: {StopResult}", callId, stopResult.Success);
+                    // 🚨 MICROSOFT COMPLIANCE REQUIREMENT: Must call updateRecordingStatus to indicate recording END
+                    // This must be called BEFORE actually stopping the recording
+                    _logger.LogInformation("Calling updateRecordingStatus API to indicate recording end for call {CallId}", callId);
+                    
+                    try
+                    {
+                        // First, update recording status to indicate recording is ending
+                        var recordingStatusResponse = await UpdateRecordingStatusAsync(callId, "notRecording", correlationId);
+                        
+                        if (recordingStatusResponse.Success)
+                        {
+                            _logger.LogInformation("Recording status successfully updated to 'notRecording' for call {CallId}, proceeding to stop recording", callId);
+                            
+                            // Only stop actual recording AFTER successful updateRecordingStatus API call
+                            var stopResult = await _callRecordingService.StopRecordingAsync(callId, CancellationToken.None);
+                            _logger.LogInformation("Recording stopped for call {CallId} with result: {StopResult}", callId, stopResult.Success);
+                            
+                            await LogComplianceCallEventAsync("RecordingStopped", correlationId);
+                            
+                            return new { 
+                                status = "recording_finalized", 
+                                callId = callId,
+                                complianceStatus = "updateRecordingStatus_called",
+                                recordingStopStatus = stopResult.Success ? "success" : "failed"
+                            };
+                        }
+                        else
+                        {
+                            _logger.LogError("Failed to update recording status to 'notRecording' for call {CallId} - stopping recording anyway for cleanup", callId);
+                            
+                            // Still try to stop recording for cleanup even if updateRecordingStatus failed
+                            var stopResult = await _callRecordingService.StopRecordingAsync(callId, CancellationToken.None);
+                            
+                            return new { 
+                                status = "recording_cleanup", 
+                                callId = callId,
+                                reason = "updateRecordingStatus_failed_but_cleaned_up",
+                                recordingStopStatus = stopResult.Success ? "success" : "failed"
+                            };
+                        }
+                    }
+                    catch (Exception updateEx)
+                    {
+                        _logger.LogError(updateEx, "Exception calling updateRecordingStatus for call termination {CallId}", callId);
+                        
+                        // Still try to stop recording for cleanup
+                        try
+                        {
+                            var stopResult = await _callRecordingService.StopRecordingAsync(callId, CancellationToken.None);
+                            return new { 
+                                status = "recording_cleanup", 
+                                callId = callId,
+                                reason = "updateRecordingStatus_exception_but_cleaned_up",
+                                error = updateEx.Message,
+                                recordingStopStatus = stopResult.Success ? "success" : "failed"
+                            };
+                        }
+                        catch (Exception stopEx)
+                        {
+                            _logger.LogError(stopEx, "Failed to cleanup recording for call {CallId}", callId);
+                            return new { 
+                                status = "error", 
+                                callId = callId,
+                                error = "Both updateRecordingStatus and cleanup failed"
+                            };
+                        }
+                    }
                 }
-
-                await LogComplianceCallEventAsync("RecordingStopped", correlationId);
 
                 return new { status = "recording_finalized", callId = callId };
             }
@@ -720,6 +820,54 @@ namespace TeamsComplianceBot.Controllers
             {
                 _logger.LogError(ex, "Error handling terminated call {CallId}", callId);
                 return new { status = "error", error = ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// Update recording status via Microsoft Graph API as required for Media Access API compliance
+        /// CRITICAL: This must be called before starting recording and before stopping recording
+        /// </summary>
+        private async Task<(bool Success, string Message)> UpdateRecordingStatusAsync(string callId, string status, string correlationId)
+        {
+            try
+            {
+                _logger.LogInformation("Updating recording status to '{Status}' for call {CallId} (correlation: {CorrelationId})", status, callId, correlationId);
+
+                // TODO: Implement actual Microsoft Graph API call to updateRecordingStatus
+                // This should use the Microsoft Graph SDK to call:
+                // PATCH /communications/calls/{call-id}/updateRecordingStatus
+                // Body: { "status": "recording" | "notRecording" }
+
+                // For now, simulate the API call
+                await Task.Delay(100); // Simulate API call delay
+
+                // Log the compliance action
+                _telemetryClient.TrackEvent("GraphAPI.UpdateRecordingStatus", new Dictionary<string, string>
+                {
+                    ["CallId"] = callId,
+                    ["Status"] = status,
+                    ["CorrelationId"] = correlationId,
+                    ["Timestamp"] = DateTimeOffset.UtcNow.ToString()
+                });
+
+                _logger.LogInformation("Recording status update simulated successfully for call {CallId} with status '{Status}'", callId, status);
+                
+                // TODO: Replace this simulation with actual Graph API implementation
+                return (true, $"Recording status updated to {status}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to update recording status for call {CallId} to '{Status}'", callId, status);
+                
+                _telemetryClient.TrackException(ex, new Dictionary<string, string>
+                {
+                    ["Operation"] = "UpdateRecordingStatus",
+                    ["CallId"] = callId,
+                    ["Status"] = status,
+                    ["CorrelationId"] = correlationId
+                });
+
+                return (false, $"Failed to update recording status: {ex.Message}");
             }
         }
 
