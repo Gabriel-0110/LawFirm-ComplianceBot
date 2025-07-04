@@ -43,6 +43,38 @@ public class BotController : ControllerBase
     }
 
     /// <summary>
+    /// Health check and information endpoint for the bot
+    /// </summary>
+    [HttpGet]
+    public IActionResult Get()
+    {
+        try
+        {
+            _logger.LogInformation("Bot endpoint health check requested");
+            
+            var botInfo = new
+            {
+                status = "healthy",
+                botName = "Teams Compliance Bot",
+                version = "1.0.0",
+                timestamp = DateTimeOffset.UtcNow,
+                endpoints = new[]
+                {
+                    "POST /api/messages - Bot Framework message handling",
+                    "GET /api/messages - This health check endpoint"
+                }
+            };
+
+            return Ok(botInfo);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during bot health check");
+            return StatusCode(500, new { status = "unhealthy", error = ex.Message });
+        }
+    }
+
+    /// <summary>
     /// Main endpoint for processing bot messages from Teams with enhanced security and compliance logging
     /// </summary>
     /// <returns>HTTP response</returns>    [HttpPost]

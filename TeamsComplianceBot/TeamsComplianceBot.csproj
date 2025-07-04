@@ -5,6 +5,12 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>1f6cc990-113a-418b-ad57-ae7ecbc7173d</UserSecretsId>
+    <Version>2.1.0</Version>
+    <AssemblyVersion>2.1.0.0</AssemblyVersion>
+    <FileVersion>2.1.0.0</FileVersion>
+    <AssemblyTitle>Teams Compliance Bot</AssemblyTitle>
+    <Product>Teams Compliance Recording Bot</Product>
+    <Company>Arandia Law Firm</Company>
   </PropertyGroup>
 
   <ItemGroup>

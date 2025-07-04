@@ -50,6 +50,41 @@ namespace TeamsComplianceBot.Controllers
         }
 
         /// <summary>
+        /// Health check and information endpoint for calls controller
+        /// </summary>
+        [HttpGet]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public IActionResult Get()
+        {
+            try
+            {
+                _logger.LogInformation("Calls endpoint health check requested");
+                
+                var callsInfo = new
+                {
+                    status = "healthy",
+                    controllerName = "Teams Calls Controller",
+                    version = "1.0.0",
+                    timestamp = DateTimeOffset.UtcNow,
+                    endpoints = new[]
+                    {
+                        "GET /api/calls - This health check endpoint",
+                        "GET /api/calls/test - Detailed test endpoint",
+                        "POST /api/calls - Call webhook processing",
+                        "OPTIONS /api/calls - CORS preflight"
+                    }
+                };
+
+                return Ok(callsInfo);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during calls controller health check");
+                return StatusCode(500, new { status = "unhealthy", error = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Test endpoint for call processing validation
         /// </summary>
         [HttpGet("test")]
