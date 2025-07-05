@@ -107,13 +107,33 @@ public IActionResult Get()
         {
             _logger.LogInformation("Received POST notification from Microsoft Graph with correlation ID {CorrelationId}", correlationId);
 
-            // Check if this is a validation request (Microsoft Graph can send validation via POST)
+            // First check for validation token in query parameters
             var validationToken = Request.Query["validationToken"].FirstOrDefault();
             if (!string.IsNullOrEmpty(validationToken))
             {
-                _logger.LogInformation("Received Graph validation request via POST with token: {ValidationTokenPreview}...",
+                _logger.LogInformation("Received Graph validation request via POST query param with token: {ValidationTokenPreview}...",
                     validationToken.Length > 10 ? validationToken.Substring(0, 10) + "..." : validationToken);
                 return Content(validationToken, "text/plain");
+            }
+
+            // Read the request body early to check for validation token
+            string requestBody;
+            using (var reader = new StreamReader(Request.Body, leaveOpen: true))
+            {
+                requestBody = await reader.ReadToEndAsync();
+            }
+
+            // Check if the body contains just a validation token (Microsoft Graph validation)
+            if (!string.IsNullOrEmpty(requestBody) && 
+                requestBody.Trim().Length > 0 && 
+                !requestBody.TrimStart().StartsWith("{") && 
+                !requestBody.TrimStart().StartsWith("["))
+            {
+                // This appears to be a plain text validation token
+                var bodyValidationToken = requestBody.Trim();
+                _logger.LogInformation("Received Graph validation request via POST body with token: {ValidationTokenPreview}...",
+                    bodyValidationToken.Length > 10 ? bodyValidationToken.Substring(0, 10) + "..." : bodyValidationToken);
+                return Content(bodyValidationToken, "text/plain");
             }
 
             // Security validation
@@ -146,13 +166,6 @@ public IActionResult Get()
             };
 
             using var scope = _logger.BeginScope(scopeProperties);
-
-            // Read the request body
-            string requestBody;
-            using (var reader = new StreamReader(Request.Body, leaveOpen: true))
-            {
-                requestBody = await reader.ReadToEndAsync();
-            }
 
             // Check if empty or invalid
             if (string.IsNullOrEmpty(requestBody))

@@ -1,7 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.22/MicrosoftTeams.schema.json",
   "manifestVersion": "1.22",
-  "version": "1.0.40",
+  "version": "1.1.0",
   "id": "153ad72f-6fa4-4e88-b0fe-f0f785466699",
   "developer": {
     "name": "Arandia Law Firm",
@@ -14,12 +14,12 @@
     "outline": "outline.png"
   },
   "name": {
-    "short": "Compliance Bot",
-    "full": "Teams Compliance Recording Bot"
+    "short": "RecordingBot",
+    "full": "RecordingBot - Compliance Recording Bot"
   },
   "description": {
-    "short": "Compliance recording for Teams calls and meetings.",
-    "full": "Bot for compliance recording of Microsoft Teams calls and meetings. It supports secure audio/video capture, storage, transcription, and alerting aligned with regulatory standards."
+    "short": "Professional call recording and compliance monitoring for Teams meetings.",
+    "full": "RecordingBot automatically records and monitors Microsoft Teams meetings for compliance purposes. Features include auto-join meetings, secure recording, transcript generation, and compliance reporting for law firms and regulated industries."
   },
   "accentColor": "#FFFFFF",
   "bots": [
@@ -36,15 +36,23 @@
           "commands": [
             {
               "title": "Help",
-              "description": "List available commands and how to use the compliance bot."
+              "description": "Show RecordingBot commands and features."
             },
             {
               "title": "Hi",
-              "description": "Start a conversation with the compliance bot."
+              "description": "Start a conversation with RecordingBot."
             },
             {
-              "title": "Compliance Status",
-              "description": "Check current compliance recording settings and policies."
+              "title": "Status",
+              "description": "Check recording status and compliance monitoring."
+            },
+            {
+              "title": "Record",
+              "description": "Start recording current meeting for compliance."
+            },
+            {
+              "title": "Report",
+              "description": "Generate compliance report for recorded meetings."
             }
           ]
         }
