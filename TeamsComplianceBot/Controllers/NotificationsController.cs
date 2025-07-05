@@ -107,6 +107,15 @@ public IActionResult Get()
         {
             _logger.LogInformation("Received POST notification from Microsoft Graph with correlation ID {CorrelationId}", correlationId);
 
+            // Check if this is a validation request (Microsoft Graph can send validation via POST)
+            var validationToken = Request.Query["validationToken"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(validationToken))
+            {
+                _logger.LogInformation("Received Graph validation request via POST with token: {ValidationTokenPreview}...",
+                    validationToken.Length > 10 ? validationToken.Substring(0, 10) + "..." : validationToken);
+                return Content(validationToken, "text/plain");
+            }
+
             // Security validation
             if (!ValidateNotificationRequest())
             {

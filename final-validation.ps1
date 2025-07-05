@@ -95,11 +95,11 @@ try {
     }
     $response = Invoke-WebRequest -Uri "$baseUrl/api/calls" -Method OPTIONS -Headers $headers -TimeoutSec 10
     Write-Host "✅ CORS Preflight - Status: $($response.StatusCode)" -ForegroundColor Green
-    $successes += "CORS Preflight"
+    $script:successes += "CORS Preflight"
 }
 catch {
     Write-Host "❌ CORS Preflight - Error: $($_.Exception.Message)" -ForegroundColor Red
-    $errors += "CORS Preflight - Error: $($_.Exception.Message)"
+    $script:errors += "CORS Preflight - Error: $($_.Exception.Message)"
 }
 
 # Test bot messages endpoint (should be 400 without proper content)
