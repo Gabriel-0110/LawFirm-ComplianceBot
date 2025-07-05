@@ -1976,433 +1976,168 @@ namespace TeamsComplianceBot.Controllers
         }
 
         /// <summary>
-        /// Clean up expired or non-existent subscriptions from local storage
+        /// Get all active subscriptions (basic GET endpoint for /api/subscriptions)
         /// </summary>
-        [HttpPost("cleanup-expired")]
-        public async Task<IActionResult> CleanupExpiredSubscriptions()
+        [HttpGet]
+        public async Task<IActionResult> Get()
         {
             try
             {
-                _logger.LogInformation("Starting cleanup of expired subscriptions");
+                _logger.LogInformation("Retrieving all Graph API subscriptions");
 
-                var subscriptionsList = await _graphClient.Subscriptions.GetAsync();
-                var activeSubscriptionIds = subscriptionsList?.Value?.Where(s => s.Id != null).Select(s => s.Id!).ToHashSet() ?? new HashSet<string>();
+                // Get all subscriptions from Microsoft Graph
+                var subscriptions = await _graphClient.Subscriptions.GetAsync();
+                var activeSubscriptions = subscriptions?.Value?.Where(s => 
+                    s.ClientState != null && 
+                    s.ClientState.Contains("TeamsComplianceBot")).ToList() ?? new List<Microsoft.Graph.Models.Subscription>();
 
-                var cleanupResults = new List<object>();
-                var removedCount = 0;
-
-                // Get all stored subscriptions (this would typically come from your storage mechanism)
-                // For now, we'll check against the Graph API directly
-                
-                _logger.LogInformation("Found {Count} active subscriptions in Microsoft Graph", activeSubscriptionIds.Count);
-
-                // This is a placeholder - you'd implement actual storage cleanup based on your storage mechanism
-                cleanupResults.Add(new
-                {
-                    action = "cleanup_completed",
-                    activeSubscriptions = activeSubscriptionIds.Count,
-                    removedSubscriptions = removedCount,
-                    message = "Expired subscription cleanup completed"
-                });
+                _logger.LogInformation("Found {Count} active Teams Compliance Bot subscriptions", activeSubscriptions.Count);
 
                 return Ok(new
                 {
                     success = true,
-                    message = $"Cleanup completed. Active subscriptions: {activeSubscriptionIds.Count}",
-                    results = cleanupResults,
+                    count = activeSubscriptions.Count,
+                    subscriptions = activeSubscriptions.Select(s => new
+                    {
+                        id = s.Id,
+                        resource = s.Resource,
+                        changeType = s.ChangeType,
+                        notificationUrl = s.NotificationUrl,
+                        expirationDateTime = s.ExpirationDateTime,
+                        clientState = s.ClientState,
+                        applicationId = s.ApplicationId
+                    }),
                     timestamp = DateTimeOffset.UtcNow
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during subscription cleanup");
+                _logger.LogError(ex, "Error retrieving subscriptions");
                 return StatusCode(500, new
                 {
                     success = false,
                     error = ex.Message,
+                    message = "Failed to retrieve subscriptions",
                     timestamp = DateTimeOffset.UtcNow
                 });
             }
         }
 
         /// <summary>
-        /// Comprehensive subscription management - handles renewal and recreation automatically
+        /// Create a new Graph API subscription (basic POST endpoint for /api/subscriptions)
         /// </summary>
-        [HttpPost("manage-all")]
-        public async Task<IActionResult> ManageAllSubscriptions()
+        [HttpPost]
+        public async Task<IActionResult> Post([FromBody] CreateSubscriptionRequest request)
         {
             try
             {
-                _logger.LogInformation("Starting comprehensive subscription management");
+                _logger.LogInformation("Creating new Graph API subscription for resource: {Resource}", request?.Resource);
 
-                // Step 1: Get all subscriptions from Microsoft Graph
-                var allGraphSubscriptions = await _graphClient.Subscriptions.GetAsync();
-                var activeGraphSubs = allGraphSubscriptions?.Value?.Where(s => 
-                    s.Id != null && 
-                    s.ClientState != null && 
-                    s.ClientState.Contains("TeamsComplianceBot")).ToList() ?? new List<Microsoft.Graph.Models.Subscription>();
-
-                _logger.LogInformation("Found {Count} active Teams Compliance Bot subscriptions in Graph", activeGraphSubs.Count);
-
-                var managementResults = new List<object>();
-                var renewedCount = 0;
-                var recreatedCount = 0;
-                var errorCount = 0;
-
-                // Step 2: Try to renew existing subscriptions
-                foreach (var subscription in activeGraphSubs)
+                if (request == null)
                 {
-                    try
+                    return BadRequest(new
                     {
-                        if (subscription.Id == null) continue;
-
-                        // Check if subscription is expiring soon (within 2 hours)
-                        var timeUntilExpiration = subscription.ExpirationDateTime - DateTimeOffset.UtcNow;
-                        if (timeUntilExpiration?.TotalHours < 2)
-                        {
-                            _logger.LogInformation("Renewing subscription {SubscriptionId} expiring in {Hours} hours", 
-                                subscription.Id, timeUntilExpiration?.TotalHours);
-
-                            var renewalRequest = new Microsoft.Graph.Models.Subscription
-                            {
-                                ExpirationDateTime = DateTimeOffset.UtcNow.AddHours(24)
-                            };
-
-                            var renewed = await _graphClient.Subscriptions[subscription.Id].PatchAsync(renewalRequest);
-                            if (renewed != null)
-                            {
-                                renewedCount++;
-                                managementResults.Add(new
-                                {
-                                    action = "renewed",
-                                    subscriptionId = subscription.Id,
-                                    resource = subscription.Resource,
-                                    oldExpiration = subscription.ExpirationDateTime,
-                                    newExpiration = renewed.ExpirationDateTime,
-                                    success = true
-                                });
-                            }
-                        }
-                        else
-                        {
-                            managementResults.Add(new
-                            {
-                                action = "no_action_needed",
-                                subscriptionId = subscription.Id,
-                                resource = subscription.Resource,
-                                expirationDateTime = subscription.ExpirationDateTime,
-                                timeRemaining = timeUntilExpiration?.ToString(@"dd\.hh\:mm\:ss"),
-                                success = true
-                            });
-                        }
-                    }
-                    catch (Microsoft.Graph.Models.ODataErrors.ODataError ex) when (ex.ResponseStatusCode == 404)
-                    {
-                        _logger.LogWarning("Subscription {SubscriptionId} not found during renewal - will recreate", subscription.Id);
-                        
-                        // Try to recreate based on resource type
-                        await RecreateSubscriptionBasedOnResourceAsync(subscription);
-                        // Note: RecreateSubscriptionBasedOnResourceAsync doesn't return a subscription object
-                        recreatedCount++;
-                        managementResults.Add(new
-                        {
-                            action = "recreated",
-                            oldSubscriptionId = subscription.Id,
-                            newSubscriptionId = "recreated", // We don't get the new ID back
-                            resource = subscription.Resource,
-                            success = true
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error managing subscription {SubscriptionId}", subscription.Id);
-                        errorCount++;
-                        managementResults.Add(new
-                        {
-                            action = "error",
-                            subscriptionId = subscription.Id,
-                            resource = subscription.Resource,
-                            error = ex.Message,
-                            success = false
-                        });
-                    }
+                        success = false,
+                        error = "Request body is required",
+                        timestamp = DateTimeOffset.UtcNow
+                    });
                 }
 
-                // Step 3: Check if we need to create missing core subscriptions
-                var coreResources = new[] { "communications/callRecords", "communications/calls", "communications/onlineMeetings" };
-                var existingResources = activeGraphSubs.Select(s => s.Resource).ToHashSet();
-
-                foreach (var coreResource in coreResources)
+                // Validate required fields
+                if (string.IsNullOrEmpty(request.Resource) || string.IsNullOrEmpty(request.ChangeType))
                 {
-                    if (!existingResources.Contains(coreResource))
+                    return BadRequest(new
                     {
-                        _logger.LogInformation("Creating missing core subscription for {Resource}", coreResource);
-                        
-                        Microsoft.Graph.Models.Subscription? created = null;
-                        if (coreResource == "communications/callRecords")
-                            created = await CreateCallRecordsSubscriptionAsync();
-                        else if (coreResource == "communications/calls")
-                            created = await CreateLiveCallsSubscriptionAsync();
-                        else if (coreResource == "communications/onlineMeetings")
-                            created = await CreateOnlineMeetingsSubscriptionAsync();
-                        if (created != null)
-                        {
-                            recreatedCount++;
-                            managementResults.Add(new
-                            {
-                                action = "created_missing",
-                                resource = coreResource,
-                                subscriptionId = created.Id,
-                                expirationDateTime = created.ExpirationDateTime,
-                                success = true
-                            });
-                        }
-                        else
-                        {
-                            errorCount++;
-                            managementResults.Add(new
-                            {
-                                action = "creation_failed",
-                                resource = coreResource,
-                                error = "Failed to create missing subscription",
-                                success = false
-                            });
-                        }
-                    }
+                        success = false,
+                        error = "Resource and ChangeType are required",
+                        timestamp = DateTimeOffset.UtcNow
+                    });
                 }
 
-                var totalActions = renewedCount + recreatedCount;
-                var success = totalActions > 0 || errorCount == 0;
+                // Use the notification URL from request or default to custom domain
+                var notificationUrl = !string.IsNullOrEmpty(request.NotificationUrl) 
+                    ? request.NotificationUrl 
+                    : "https://arandiateamsbot.ggunifiedtech.com/api/notifications";
 
-                return Ok(new
+                // Create the subscription
+                var subscription = new Microsoft.Graph.Models.Subscription
                 {
-                    success = success,
-                    message = $"Subscription management completed: {renewedCount} renewed, {recreatedCount} recreated, {errorCount} errors",
-                    summary = new
+                    Resource = request.Resource,
+                    ChangeType = request.ChangeType,
+                    NotificationUrl = notificationUrl,
+                    ExpirationDateTime = request.ExpirationDateTime ?? DateTimeOffset.UtcNow.AddHours(1),
+                    ClientState = request.ClientState ?? $"TeamsComplianceBot-{request.Resource?.Replace("/", "-")}-{DateTimeOffset.UtcNow:yyyyMMdd}"
+                };
+
+                var createdSubscription = await _graphClient.Subscriptions.PostAsync(subscription);
+
+                if (createdSubscription != null)
+                {
+                    _logger.LogInformation("Successfully created subscription: {SubscriptionId} for resource: {Resource}", 
+                        createdSubscription.Id, createdSubscription.Resource);
+
+                    return Ok(new
                     {
-                        totalSubscriptions = activeGraphSubs.Count,
-                        renewedSubscriptions = renewedCount,
-                        recreatedSubscriptions = recreatedCount,
-                        errors = errorCount,
-                        managementActions = totalActions
-                    },
-                    results = managementResults,
-                    nextManagement = DateTimeOffset.UtcNow.AddHours(2), // Suggest next management in 2 hours
+                        success = true,
+                        subscription = new
+                        {
+                            id = createdSubscription.Id,
+                            resource = createdSubscription.Resource,
+                            changeType = createdSubscription.ChangeType,
+                            notificationUrl = createdSubscription.NotificationUrl,
+                            expirationDateTime = createdSubscription.ExpirationDateTime,
+                            clientState = createdSubscription.ClientState,
+                            applicationId = createdSubscription.ApplicationId
+                        },
+                        message = "Subscription created successfully",
+                        timestamp = DateTimeOffset.UtcNow
+                    });
+                }
+                else
+                {
+                    return StatusCode(500, new
+                    {
+                        success = false,
+                        error = "Failed to create subscription - no response from Graph API",
+                        timestamp = DateTimeOffset.UtcNow
+                    });
+                }
+            }
+            catch (Microsoft.Graph.Models.ODataErrors.ODataError ex)
+            {
+                _logger.LogError(ex, "Graph API error creating subscription");
+                return StatusCode(ex.ResponseStatusCode > 0 ? ex.ResponseStatusCode : 500, new
+                {
+                    success = false,
+                    error = ex.Error?.Message ?? ex.Message,
+                    code = ex.Error?.Code,
+                    details = ex.Error?.Details?.Select(d => new { code = d.Code, message = d.Message }),
                     timestamp = DateTimeOffset.UtcNow
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in comprehensive subscription management");
+                _logger.LogError(ex, "Error creating subscription");
                 return StatusCode(500, new
                 {
                     success = false,
                     error = ex.Message,
-                    message = "Failed to manage subscriptions",
+                    message = "Failed to create subscription",
                     timestamp = DateTimeOffset.UtcNow
                 });
             }
         }
 
         /// <summary>
-        /// Quick fix for the Application Insights 404 renewal errors
+        /// Request model for creating subscriptions
         /// </summary>
-        [HttpPost("fix-renewal-errors")]
-        public async Task<IActionResult> FixRenewalErrors()
+        public class CreateSubscriptionRequest
         {
-            try
-            {
-                _logger.LogInformation("🔧 FIXING: Application Insights 404 renewal errors");
-
-                var results = new List<object>();
-                var fixedCount = 0;
-
-                // Get all current subscriptions from Graph
-                var allSubs = await _graphClient.Subscriptions.GetAsync();
-                var activeSubs = allSubs?.Value?.Where(s => 
-                    s.ClientState != null && 
-                    s.ClientState.Contains("TeamsComplianceBot")).ToList() ?? new List<Microsoft.Graph.Models.Subscription>();
-
-                _logger.LogInformation("Found {Count} active bot subscriptions", activeSubs.Count);
-
-                // Check each subscription and fix issues
-                foreach (var sub in activeSubs.ToList()) // ToList to avoid modification during iteration
-                {
-                    try
-                    {
-                        if (sub.Id == null) continue;
-
-                        // Test if subscription still exists by trying to get it
-                        var testSub = await _graphClient.Subscriptions[sub.Id].GetAsync();
-                        
-                        if (testSub != null)
-                        {
-                            // Subscription exists - check if it needs renewal
-                            var timeUntilExpiration = testSub.ExpirationDateTime - DateTimeOffset.UtcNow;
-                            
-                            if (timeUntilExpiration?.TotalHours < 6) // Renew if expiring within 6 hours
-                            {
-                                var renewalRequest = new Microsoft.Graph.Models.Subscription
-                                {
-                                    ExpirationDateTime = DateTimeOffset.UtcNow.AddHours(23) // 23 hours to be safe
-                                };
-
-                                var renewed = await _graphClient.Subscriptions[sub.Id].PatchAsync(renewalRequest);
-                                fixedCount++;
-                                
-                                results.Add(new
-                                {
-                                    action = "✅ RENEWED",
-                                    subscriptionId = sub.Id,
-                                    resource = sub.Resource,
-                                    oldExpiry = testSub.ExpirationDateTime,
-                                    newExpiry = renewed?.ExpirationDateTime,
-                                    success = true
-                                });
-                                
-                                _logger.LogInformation("✅ RENEWED subscription {Id} for {Resource}", sub.Id, sub.Resource);
-                            }
-                            else
-                            {
-                                results.Add(new
-                                {
-                                    action = "⏱️ OK - Not expiring soon",
-                                    subscriptionId = sub.Id,
-                                    resource = sub.Resource,
-                                    expiresIn = timeUntilExpiration?.ToString(@"dd\.hh\:mm\:ss"),
-                                    success = true
-                                });
-                            }
-                        }
-                    }
-                    catch (Microsoft.Graph.Models.ODataErrors.ODataError ex) when (ex.ResponseStatusCode == 404)
-                    {
-                        _logger.LogWarning("🗑️ FOUND 404: Subscription {Id} doesn't exist - creating replacement", sub.Id);
-                        
-                        // This is the 404 error from your Application Insights!
-                        // Create a replacement subscription
-                        Microsoft.Graph.Models.Subscription? newSub = null;
-                        
-                        if (sub.Resource?.Contains("callRecords") == true)
-                        {
-                            newSub = await CreateCallRecordsSubscriptionAsync();
-                        }
-                        else if (sub.Resource?.Contains("calls") == true)
-                        {
-                            newSub = await CreateLiveCallsSubscriptionAsync();
-                        }
-                        else if (sub.Resource?.Contains("onlineMeetings") == true)
-                        {
-                            newSub = await CreateOnlineMeetingsSubscriptionAsync();
-                        }
-
-                        if (newSub != null)
-                        {
-                            fixedCount++;
-                            results.Add(new
-                            {
-                                action = "🔧 RECREATED (was getting 404)",
-                                oldSubscriptionId = sub.Id,
-                                newSubscriptionId = newSub.Id,
-                                resource = sub.Resource,
-                                newExpiry = newSub.ExpirationDateTime,
-                                success = true,
-                                note = "This fixes your Application Insights 404 errors!"
-                            });
-                            
-                            _logger.LogInformation("🔧 RECREATED subscription for {Resource}: {OldId} -> {NewId}", 
-                                sub.Resource, sub.Id, newSub.Id);
-                        }
-                        else
-                        {
-                            results.Add(new
-                            {
-                                action = "❌ FAILED to recreate",
-                                subscriptionId = sub.Id,
-                                resource = sub.Resource,
-                                error = "Recreation failed",
-                                success = false
-                            });
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        results.Add(new
-                        {
-                            action = "❌ ERROR",
-                            subscriptionId = sub.Id,
-                            resource = sub.Resource,
-                            error = ex.Message,
-                            success = false
-                        });
-                    }
-                }
-
-                // Also ensure we have the core subscriptions
-                var coreSubscriptions = new[] { "communications/callRecords", "communications/calls" };
-                var existingResources = activeSubs.Where(s => s.Resource != null).Select(s => s.Resource).ToHashSet();
-
-                foreach (var coreResource in coreSubscriptions)
-                {
-                    if (!existingResources.Contains(coreResource))
-                    {
-                        _logger.LogInformation("🆕 CREATING missing core subscription: {Resource}", coreResource);
-                        
-                        Microsoft.Graph.Models.Subscription? created = null;
-                        if (coreResource == "communications/callRecords")
-                            created = await CreateCallRecordsSubscriptionAsync();
-                        else if (coreResource == "communications/calls")
-                            created = await CreateLiveCallsSubscriptionAsync();
-
-                        if (created != null)
-                        {
-                            fixedCount++;
-                            results.Add(new
-                            {
-                                action = "🆕 CREATED missing",
-                                resource = coreResource,
-                                subscriptionId = created.Id,
-                                expiry = created.ExpirationDateTime,
-                                success = true
-                            });
-                        }
-                    }
-                }
-
-                return Ok(new
-                {
-                    success = true,
-                    message = $"🔧 FIXED! Resolved {fixedCount} subscription issues that were causing Application Insights 404 errors",
-                    summary = new
-                    {
-                        totalIssuesFixed = fixedCount,
-                        totalChecked = activeSubs.Count,
-                        applicationInsightsErrors = "Should stop seeing 404 renewal errors now!",
-                        nextCheck = DateTimeOffset.UtcNow.AddHours(6)
-                    },
-                    results = results,
-                    instructions = new[]
-                    {
-                        "✅ This should fix your Application Insights 404 errors",
-                        "✅ Old expired subscriptions have been replaced",
-                        "✅ Core subscriptions are now active",
-                        "⏰ Run this endpoint every 6-12 hours to prevent future issues",
-                        "📊 Monitor Application Insights for reduced 404 errors"
-                    },
-                    timestamp = DateTimeOffset.UtcNow
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error fixing renewal errors");
-                return StatusCode(500, new
-                {
-                    success = false,
-                    error = ex.Message,
-                    message = "Failed to fix renewal errors",
-                    timestamp = DateTimeOffset.UtcNow
-                });
-            }
+            public string? Resource { get; set; }
+            public string? ChangeType { get; set; }
+            public string? NotificationUrl { get; set; }
+            public DateTimeOffset? ExpirationDateTime { get; set; }
+            public string? ClientState { get; set; }
         }
     }
 }

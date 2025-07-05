@@ -1070,5 +1070,161 @@ namespace TeamsComplianceBot.Controllers
                 _logger.LogWarning(ex, "Error logging call details for event type {EventType}", eventType);
             }
         }
+
+        /// <summary>
+        /// Check Graph API permissions for call recording and monitoring
+        /// </summary>
+        [HttpGet("permissions")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> GetPermissions()
+        {
+            try
+            {
+                _logger.LogInformation("Checking Graph API permissions for call recording");
+                
+                var permissionTests = new List<object>();
+                var results = new List<object>();
+
+                // Test 1: CallRecords.Read.All
+                try
+                {
+                    var callRecords = await _graphServiceClient.Communications.CallRecords.GetAsync(requestConfiguration =>
+                    {
+                        requestConfiguration.QueryParameters.Top = 1;
+                    });
+                    
+                    results.Add(new
+                    {
+                        permission = "CallRecords.Read.All",
+                        status = "✅ Granted",
+                        required = true,
+                        description = "Read call records for compliance monitoring",
+                        testResult = "Successfully accessed call records endpoint"
+                    });
+                }
+                catch (Exception ex)
+                {
+                    results.Add(new
+                    {
+                        permission = "CallRecords.Read.All",
+                        status = "❌ Missing or access denied",
+                        required = true,
+                        description = "Read call records for compliance monitoring",
+                        error = ex.Message,
+                        testResult = "Failed to access call records endpoint"
+                    });
+                }
+
+                // Test 2: Calls.AccessMedia.All (for joining calls)
+                try
+                {
+                    // Test if we can access calls endpoint (this might fail but helps verify permission)
+                    var callsTest = await _graphServiceClient.Communications.Calls.GetAsync(requestConfiguration =>
+                    {
+                        requestConfiguration.QueryParameters.Top = 1;
+                    });
+                    
+                    results.Add(new
+                    {
+                        permission = "Calls.AccessMedia.All",
+                        status = "✅ Granted",
+                        required = true,
+                        description = "Join and record Teams calls",
+                        testResult = "Successfully accessed calls endpoint"
+                    });
+                }
+                catch (Exception ex)
+                {
+                    var statusMessage = ex.Message.Contains("Forbidden") || ex.Message.Contains("Unauthorized") 
+                        ? "❌ Missing or access denied" 
+                        : "⚠️ Cannot verify (may still be granted)";
+                        
+                    results.Add(new
+                    {
+                        permission = "Calls.AccessMedia.All",
+                        status = statusMessage,
+                        required = true,
+                        description = "Join and record Teams calls",
+                        note = "This permission might be granted but not testable via this endpoint",
+                        testResult = ex.Message
+                    });
+                }
+
+                // Test 3: OnlineMeetings.ReadWrite.All
+                try
+                {
+                    // Try to access online meetings (this might not work for service principal)
+                    var meetingsTest = await _graphServiceClient.Communications.OnlineMeetings.GetAsync(requestConfiguration =>
+                    {
+                        requestConfiguration.QueryParameters.Top = 1;
+                    });
+                    
+                    results.Add(new
+                    {
+                        permission = "OnlineMeetings.ReadWrite.All",
+                        status = "✅ Granted",
+                        required = false,
+                        description = "Create and manage online meetings",
+                        testResult = "Successfully accessed online meetings endpoint"
+                    });
+                }
+                catch (Exception ex)
+                {
+                    var statusMessage = ex.Message.Contains("Forbidden") || ex.Message.Contains("Unauthorized") 
+                        ? "❌ Missing or access denied" 
+                        : "⚠️ Cannot verify (may still be granted)";
+                        
+                    results.Add(new
+                    {
+                        permission = "OnlineMeetings.ReadWrite.All",
+                        status = statusMessage,
+                        required = false,
+                        description = "Create and manage online meetings",
+                        note = "This permission might be granted but not testable via this endpoint",
+                        testResult = ex.Message
+                    });
+                }
+
+                var grantedCount = results.Count(r => r.GetType().GetProperty("status")?.GetValue(r)?.ToString()?.Contains("✅") == true);
+                var requiredCount = results.Count(r => r.GetType().GetProperty("required")?.GetValue(r) as bool? == true);
+                var requiredGranted = results.Count(r => 
+                    r.GetType().GetProperty("required")?.GetValue(r) as bool? == true && 
+                    r.GetType().GetProperty("status")?.GetValue(r)?.ToString()?.Contains("✅") == true);
+
+                return Ok(new
+                {
+                    success = true,
+                    permissionStatus = new
+                    {
+                        total = results.Count,
+                        granted = grantedCount,
+                        required = requiredCount,
+                        requiredGranted = requiredGranted,
+                        ready = requiredGranted >= requiredCount
+                    },
+                    permissions = results,
+                    analysis = new
+                    {
+                        callRecordingReady = requiredGranted >= requiredCount,
+                        recommendation = requiredGranted < requiredCount 
+                            ? "Grant missing required permissions in Azure AD app registration"
+                            : "Permissions look good for call recording functionality"
+                    },
+                    timestamp = DateTimeOffset.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking Graph API permissions");
+                return StatusCode(500, new
+                {
+                    success = false,
+                    error = ex.Message,
+                    message = "Failed to check Graph API permissions",
+                    timestamp = DateTimeOffset.UtcNow
+                });
+            }
+        }
     }
 }
